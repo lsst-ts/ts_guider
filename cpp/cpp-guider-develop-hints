@@ -1,0 +1,27 @@
+export CCSDAQ_RELEASE=$CCSDAQ
+git clone https://github.com/GalSim-developers/GalSim.git
+git clone https://github.com/lsst-camera-ccs/org-lsst-ccs-drivers-daq
+git clone https://github.com/lsst-ts/ts_guider
+git clone --recursive https://github.com/pybind/cmake_example.git
+
+wget https://repo-nexus.lsst.org/nexus/repository/daq/daq-sdk/$CCSDAQ_RELEASE.tgz
+tar xzf $CCSDAQ_RELEASE.tgz
+pip3 install "litgen@git+https://github.com/pthom/litgen"
+git clone https://github.com/pthom/litgen_template
+cd litgen_template
+python3.11 tools/change_lib_name/change_lib_name.py
+  GDS
+  d
+  d
+cd src/cpp_native_libraries
+ln -s  ../../../../$CCSDAQ/include/gds  .
+ln -s  ../../../../$CCSDAQ/include/net  .
+cp  ../../../../$CCSDAQ/include/gds/Subscriber.hh GDS.h
+rm cpp/*
+cd ../..
+python3 tools/autogenerate_bindings.py
+
+cd ../guiderGDS
+ln -s ../R5-V12.1/include/gds .
+ln -s ../R5-V12.1/include/net .
+
