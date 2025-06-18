@@ -1,0 +1,8 @@
+/home/dmills/lsst/guider/cmake_example/src/CMakeFiles/guiderAlgorithms.dir
+/home/dmills/lsst/guider/cmake_example/src/CMakeFiles/guiderGDS.dir
+/home/dmills/lsst/guider/cmake_example/src/CMakeFiles/guiderCentroid.dir
+/home/dmills/lsst/guider/cmake_example/src/CMakeFiles/guiderProcessor.dir
+/home/dmills/lsst/guider/cmake_example/src/CMakeFiles/edit_cache.dir
+/home/dmills/lsst/guider/cmake_example/src/CMakeFiles/rebuild_cache.dir
+/home/dmills/lsst/guider/cmake_example/src/pybind11/CMakeFiles/edit_cache.dir
+/home/dmills/lsst/guider/cmake_example/src/pybind11/CMakeFiles/rebuild_cache.dir

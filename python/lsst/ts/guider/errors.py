@@ -1,6 +1,6 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_guider.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -19,13 +19,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+__all__ = ["GuiderErrorCode"]
 
-from .alignment_csc import *
-from .alignment_model import *
-from .config_schema import *
-from .errors import *
-from .mock_t2sa import *
+from enum import IntEnum
+
+
+class GuiderErrorCode(IntEnum):
+    """Error codes in GDS, Centroid, or Processor."""
+
+  COMMAND_TIMEOUT=-1
+  NOSPACE=-2
+  POST_FAIL=-3
+  SUCCESS=0
+  INVALID_PARAMETER=1
+  INVALID_TRANSITION=2
+  INVALID_COMMAND=3
+  CONFIG_FAILED=4
+  INVALID=5
+  UNKNOWN=6
+

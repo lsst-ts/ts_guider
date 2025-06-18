@@ -1,6 +1,6 @@
-# This file is part of ts_MTAlignment.
+# This file is part of ts_guider.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -19,13 +19,24 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+__all__ = ["CONFIG_SCHEMA"]
 
-from .alignment_csc import *
-from .alignment_model import *
-from .config_schema import *
-from .errors import *
-from .mock_t2sa import *
+import yaml
+
+CONFIG_SCHEMA = yaml.safe_load(
+    """
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://github.com/lsst-ts/ts_guider/blob/master/schema/guider.yaml
+# title must end with one or more spaces followed by the schema version, which must begin with "v"
+title: Guider v1
+description: Schema for Guider CSC configuration files
+type: object
+properties:
+  GDS_host:
+    description: TCP/IP host address of GDS service.
+    type: string
+requiredProperties:
+  - GDS_host
+additionalProperties: false
+"""
+)
