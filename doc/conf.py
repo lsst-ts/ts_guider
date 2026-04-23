@@ -3,11 +3,12 @@
 This configuration only affects single-package Sphinx documentation builds.
 """
 
-from documenteer.sphinxconfig.stackconf import build_package_configs
 import lsst.ts.guider
-
+from documenteer.sphinxconfig.stackconf import build_package_configs
 
 _g = globals()
-_g.update(build_package_configs(
-    project_name='ts_guider',
-    version=lsst.ts.guider.version.__version__))
+_g.update(
+    build_package_configs(
+        project_name="ts_guider", version=lsst.ts.guider.version.__version__
+    )
+)

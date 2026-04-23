@@ -17,12 +17,20 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import __version__
-except ImportError:
-    __version__ = "?"
+__all__ = ["CONFIG_SCHEMA"]
 
-from .config_schema import *
-from .guider_csc import *
+import yaml
+
+CONFIG_SCHEMA = yaml.safe_load(
+    """
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://github.com/lsst-ts/ts_guider/blob/main/python/lsst/ts/guider/config_schema.py
+# title must end with one or more spaces followed by the schema version, which must begin with "v"
+title: Guider v1
+description: Schema for Guider configuration files
+type: object
+properties: {}
+additionalProperties: false
+"""
+)
