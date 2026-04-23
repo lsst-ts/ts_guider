@@ -3,12 +3,13 @@
 This configuration only affects single-package Sphinx documentation builds.
 """
 
-import lsst.ts.guider
-from documenteer.sphinxconfig.stackconf import build_package_configs
+import lsst.ts.guider  # noqa
+from documenteer.conf.guide import *  # noqa
 
-_g = globals()
-_g.update(
-    build_package_configs(
-        project_name="ts_guider", version=lsst.ts.guider.version.__version__
-    )
-)
+project = "ts_guider"
+html_theme_options["logotext"] = project  # type: ignore # noqa
+html_title = project
+html_short_title = project
+
+intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # type: ignore # noqa
+intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # type: ignore # noqa
