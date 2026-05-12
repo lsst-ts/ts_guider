@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ts_guider"
+description = "CSC for the guider subsystem at the Vera C. Rubin Observatory."
+license = { text = "GPL" }
+classifiers = ["Programming Language :: Python :: 3"]
+urls = { documentation = "https://ts-guider.lsst.io", repository = "https://github.com/lsst-ts/ts_guider" }
+dynamic = ["version"]
+
+[tool.setuptools.dynamic]
+version = { attr = "setuptools_scm.get_version" }
+
+[tool.setuptools.packages.find]
+where = ["python"]
+
+[project.scripts]
+run_guider_csc = "lsst.ts.guider:run_guider_csc"
+
+[tool.setuptools_scm]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[project.optional-dependencies]
+dev = ["documenteer[pipelines]"]

@@ -1,0 +1,1 @@
+Fix EUPS dependencies and CI configuration for the Guider package.

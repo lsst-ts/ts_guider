@@ -1,0 +1,1 @@
+Add Guider CSC skeleton with standard state transitions and unit tests.
