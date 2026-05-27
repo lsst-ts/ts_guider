@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -I/home/dmills/lsst/guider/R5-V13.5/include -flto -L/home/dmills/lsst/guider/R5-V13.5/x86/lib -ldaq_dsi -ldaq_dsm -ldaq_dsid -ldaq_daq -ldaq_dvi -ldaq_net -ldaq_osa -ldaq_rms -ldaq_reb -ldaq_scs -ldaq_hash -shared  -o guiderCentroid.cpython-311-x86_64-linux-gnu.so CMakeFiles/guiderCentroid.dir/pybind_guiderCentroid.cpp.o 
