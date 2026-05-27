@@ -2,63 +2,50 @@
 
 .. _lsst.ts.guider:
 
-###################
+##############
 lsst.ts.guider
-###################
+##############
 
-.. image:: https://img.shields.io/badge/Project Metadata-gray.svg
-    :target: https://ts-xml.lsst.io/index.html#index-master-csc-table-guider
-.. image:: https://img.shields.io/badge/SAL\ Interface-gray.svg
-    :target: https://ts-xml.lsst.io/sal_interfaces/guider.html
-.. image:: https://img.shields.io/badge/GitHub-gray.svg
-    :target: https://github.com/lsst-ts/ts_guider
-.. image:: https://img.shields.io/badge/Jira-gray.svg
-    :target: https://jira.lsstcorp.org/issues/?jql=labels+%3D+ts_guider
+.. Paragraph that describes what this Python module does and links to related modules and frameworks.
 
-Overview
-========
+.. .. _lsst.ts.guider-using:
 
-The guider CSC.
+.. Using lsst.ts.guider
+.. ====================
 
-User Guide
-==========
+.. toctree linking to topics related to using the module's APIs.
 
-Start the guider CSC
--------------------------
+.. .. toctree::
+..    :maxdepth: 1
 
-.. prompt:: bash
+.. _lsst.ts.guider-contributing:
 
-    run_guider
+Contributing
+============
 
-.. _lsst.ts.guider.configuration:
+``lsst.ts.guider`` is developed at https://github.com/lsst-ts/ts_guider.
+You can find Jira issues for this module under the `ts_guider <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20component%20%3D%20ts_guider>`_ component.
 
-Configuration
--------------
+.. If there are topics related to developing this module (rather than using it), link to this from a toctree placed here.
 
-Configuration is specified in `ts_config_mttcs <https://github.com/lsst-ts/ts_config_mttcs>`_ following `this schema <https://github.com/lsst-ts/ts_guider/blob/develop/python/lsst/ts/guider/config_schema.py>`_.
+.. .. toctree::
+..    :maxdepth: 1
 
-Simulator
----------
+.. .. _lsst.ts.guider-scripts:
 
+.. Script reference
+.. ================
 
-To run using CSC's internal simulator:
+.. .. TODO: Add an item to this toctree for each script reference topic in the scripts subdirectory.
 
-.. prompt:: bash
+.. .. toctree::
+..    :maxdepth: 1
 
-    run_guider --simulate={mode}
+.. .. _lsst.ts.guider-pyapi:
 
-.. _lsst.ts.guider.enable_with_eui:
+Python API reference
+====================
 
-Developer Guide
-===============
-
-.. toctree::
-    developer_guide
-    :maxdepth: 1
-
-Version History
-===============
-
-.. toctree::
-    version_history
-    :maxdepth: 1
+.. automodapi:: lsst.ts.guider
+   :no-main-docstr:
+   :no-inheritance-diagram:
