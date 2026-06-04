@@ -2,7 +2,7 @@
 
 This is a runnable demo, not an automated test.  It requires the
 GDS emulator infrastructure running inside the development
-container (manual_run_develop_env).
+container with image: lsstts/develop-env:develop
 
 Prerequisites
 -------------
@@ -134,10 +134,10 @@ def on_stamp(pixels: np.ndarray, metadata: guiderGDS.StampMetadata) -> None:
         done.set()
 
 
-source.start(on_stamp)
+source.start_stamp_stream(on_stamp)
 try:
     if not done.wait(timeout=TIMEOUT_SECONDS):
         print(f"timeout — only received {len(received)} stamps")
 finally:
-    source.stop()
+    source.stop_stamp_stream()
     print(f"received {len(received)} stamps in Python")

@@ -18,10 +18,10 @@ DaqStampSource::DaqStampSource(std::string             partition,
 
 DaqStampSource::~DaqStampSource()
 {
-    stop();
+    unsubscribe();
 }
 
-void DaqStampSource::start(::guider::StampCallback on_stamp)
+void DaqStampSource::subscribe(::guider::StampCallback on_stamp)
 {
     if (_running.exchange(true))
     {
@@ -37,14 +37,14 @@ void DaqStampSource::start(::guider::StampCallback on_stamp)
     }
     catch (...)
     {
-        // Roll back so a future start() can retry.
+        // Roll back so a future subscribe() can retry.
         _running.store(false);
         _decoder.reset();
         throw;
     }
 }
 
-void DaqStampSource::stop()
+void DaqStampSource::unsubscribe()
 {
     if (!_running.exchange(false))
     {
@@ -75,7 +75,7 @@ void DaqStampSource::run_loop()
     // Any exception escaping wait() (e.g. allocate() invariant break)
     // is caught here so it does not propagate out of the std::thread
     // (which would call std::terminate). The loop exits and the next
-    // stop() / dtor cleans up; Python-side will see no further stamps.
+    // unsubscribe() / dtor cleans up; Python-side will see no further stamps.
     if (!_decoder) return;
 
     try

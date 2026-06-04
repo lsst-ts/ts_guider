@@ -31,19 +31,19 @@ namespace {
 //      memcpy the pixels, dispatch to Python.
 //
 //   2. ~PythonStampCallback runs wherever the owning std::function
-//      is destroyed. In practice that is DaqStampSource::stop(),
+//      is destroyed. In practice that is DaqStampSource::unsubscribe(),
 //      bound with py::call_guard<py::gil_scoped_release> - GIL is
 //      *not* held when we get here. Destroying the inner py::object
 //      calls dec_ref(), and pybind11 3.0 asserts GIL-held on every
 //      ref-count change. Acquire the GIL before clearing the object.
 //
 // StampCallback is a std::function, which may copy what it stores
-// internally. Copying this class is forbidden (= delete copy
-// constructor on this class). make_python_callback() therefore puts one
-// instance on the
-// heap inside std::shared_ptr and returns a small lambda that only
-// copies that pointer; every copy shares the same Python callback,
-// and the GIL-aware destructor runs once when the last copy is gone.
+// internally. Copying this class is forbidden hence (= delete copy
+// constructor on this class). make_python_callback() therefore puts 
+// one instance on the heap inside std::shared_ptr and returns a small 
+// lambda that only copies that pointer; every copy shares the same 
+// Python callback, and the GIL-aware destructor runs once when the 
+// last copy is gone.
 class PythonStampCallback
 {
 public:
@@ -144,17 +144,19 @@ PYBIND11_MODULE(guiderGDS, m)
         .def(py::init<std::string, const GDS::LocationSet&>(),
              py::arg("partition"),
              py::arg("locations"))
-        .def("start",
+        .def("start_stamp_stream",
              [](GDS::Guider::DaqStampSource& self, py::object py_callback)
              {
-                 self.start(make_python_callback(std::move(py_callback)));
+                 self.subscribe(make_python_callback(std::move(py_callback)));
              },
              py::arg("on_stamp"),
-             "Start the receive loop. on_stamp is invoked from a C++ "
-             "worker thread as on_stamp(pixels, metadata).",
+             "Subscribe to the GDS partition and start delivering "
+             "stamps. on_stamp is called from a C++ worker thread "
+             "as on_stamp(pixels, metadata).",
              py::call_guard<py::gil_scoped_release>())
-        .def("stop",
-             &GDS::Guider::DaqStampSource::stop,
-             "Abort the receive loop and join the worker thread.",
+        .def("stop_stamp_stream",
+             &GDS::Guider::DaqStampSource::unsubscribe,
+             "Stop delivering stamps, join the worker thread, and "
+             "release the GDS subscription.",
              py::call_guard<py::gil_scoped_release>());
 }

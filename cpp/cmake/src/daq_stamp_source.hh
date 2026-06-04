@@ -24,8 +24,9 @@ namespace GDS { namespace Guider {
 // Thread layout: one DaqStampSource owns one Decoder which is
 // subscribed to one or more sensors. Per Gregg, callbacks within a
 // single Decoder are serialized, so Decoder's single shared decode
-// buffer is safe. For parallel-stream operation you would create
-// multiple DaqStampSources, one per sensor, and rendezvous outside.
+// buffer is safe.
+// TBD: For parallel-stream operation you would create multiple 
+// DaqStampSources, one per sensor, and rendezvous outside.
 class DaqStampSource
 {
 public:
@@ -35,12 +36,14 @@ public:
 
     // Construct a Decoder bound to `on_stamp`, spawn a worker thread
     // that runs `while(*decoder_) decoder_->wait();`. Idempotent;
-    // a second call while running is a no-op.
-    void start(::guider::StampCallback on_stamp);
+    // a second call while subscribed is a no-op.
+    // Not to be confused with the SDK's Decoder::start() callback,
+    // which is a per-series lifecycle event invoked by wait().
+    void subscribe(::guider::StampCallback on_stamp);
 
     // Signal abort to the Decoder, join the worker, destroy the
     // Decoder. Idempotent. Called automatically by the destructor.
-    void stop();
+    void unsubscribe();
 
 private:
     void run_loop();
