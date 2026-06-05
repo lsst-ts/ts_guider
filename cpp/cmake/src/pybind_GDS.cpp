@@ -159,4 +159,44 @@ PYBIND11_MODULE(guiderGDS, m)
              "Stop delivering stamps, join the worker thread, and "
              "release the GDS subscription.",
              py::call_guard<py::gil_scoped_release>());
+
+    // Test-only seam (underscore-prefixed). Builds a guider::Stamp from
+    // a numpy array and runs it through the same make_python_callback /
+    // PythonStampCallback path the SDK uses, so the binding (array copy,
+    // metadata marshalling, exception containment) can be unit-tested
+    // from pytest without a live DAQ or emulator.
+    //
+    // Unlike start_stamp_stream, this is invoked synchronously on the
+    // calling (main) thread with the GIL held; PythonStampCallback's
+    // gil_scoped_acquire then nests harmlessly. The genuine no-GIL
+    // worker-thread acquire is covered by the emulator demo, not here.
+    m.def("_invoke_callback_for_test",
+          [](py::object on_stamp,
+             py::array_t<std::int32_t,
+                         py::array::c_style | py::array::forcecast> pixels,
+             std::uint32_t sensor_index,
+             std::uint32_t sequence,
+             std::uint32_t stamp_index,
+             std::uint64_t timestamp_ns)
+          {
+              ::guider::Stamp stamp;
+              stamp.pixels = pixels.data();
+              stamp.rows   = static_cast<std::size_t>(pixels.shape(0));
+              stamp.cols   = static_cast<std::size_t>(pixels.shape(1));
+              stamp.metadata.timestamp_ns = timestamp_ns;
+              stamp.metadata.sensor_index = sensor_index;
+              stamp.metadata.sequence     = sequence;
+              stamp.metadata.stamp_index  = stamp_index;
+
+              auto callback = make_python_callback(std::move(on_stamp));
+              callback(stamp);
+          },
+          py::arg("on_stamp"),
+          py::arg("pixels"),
+          py::arg("sensor_index") = 0,
+          py::arg("sequence")     = 0,
+          py::arg("stamp_index")  = 0,
+          py::arg("timestamp_ns") = 0,
+          "Test-only: run a synthetic 2D int32 stamp through the "
+          "stamp-callback path. Not part of the public API.");
 }
