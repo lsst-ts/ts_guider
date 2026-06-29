@@ -110,9 +110,13 @@ PYBIND11_MODULE(guiderGDS, m)
         .def_readonly("sensor_index", &::guider::StampMetadata::sensor_index)
         .def_readonly("sequence",     &::guider::StampMetadata::sequence)
         .def_readonly("stamp_index",  &::guider::StampMetadata::stamp_index)
+        .def_readonly("sensor_name",  &::guider::StampMetadata::sensor_name)
+        .def_readonly("segment",      &::guider::StampMetadata::segment)
         .def("__repr__", [](const ::guider::StampMetadata& md)
         {
             return "<StampMetadata sensor=" + std::to_string(md.sensor_index)
+                 + " name=" + md.sensor_name
+                 + " segment=" + std::to_string(md.segment)
                  + " seq=" + std::to_string(md.sequence)
                  + " stamp=" + std::to_string(md.stamp_index)
                  + " ts=" + std::to_string(md.timestamp_ns) + ">";
@@ -177,7 +181,9 @@ PYBIND11_MODULE(guiderGDS, m)
              std::uint32_t sensor_index,
              std::uint32_t sequence,
              std::uint32_t stamp_index,
-             std::uint64_t timestamp_ns)
+             std::uint64_t timestamp_ns,
+             std::string   sensor_name,
+             std::uint16_t segment)
           {
               ::guider::Stamp stamp;
               stamp.pixels = pixels.data();
@@ -187,6 +193,8 @@ PYBIND11_MODULE(guiderGDS, m)
               stamp.metadata.sensor_index = sensor_index;
               stamp.metadata.sequence     = sequence;
               stamp.metadata.stamp_index  = stamp_index;
+              stamp.metadata.sensor_name  = std::move(sensor_name);
+              stamp.metadata.segment      = segment;
 
               auto callback = make_python_callback(std::move(on_stamp));
               callback(stamp);
@@ -197,6 +205,8 @@ PYBIND11_MODULE(guiderGDS, m)
           py::arg("sequence")     = 0,
           py::arg("stamp_index")  = 0,
           py::arg("timestamp_ns") = 0,
+          py::arg("sensor_name")  = std::string(),
+          py::arg("segment")      = 0,
           "Test-only: run a synthetic 2D int32 stamp through the "
           "stamp-callback path. Not part of the public API.");
 }

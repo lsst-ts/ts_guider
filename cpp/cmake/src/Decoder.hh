@@ -56,6 +56,9 @@ private:
     unsigned       _stamps [GDS::Set::SIZE];
     unsigned       _rstamps[GDS::Set::SIZE];
 
+    // Per-sensor ROI segment. 
+    std::uint16_t  _segment[GDS::Set::SIZE];
+
     // Decode buffer handed to the SDK in allocate(). Sized once per
     // series; reused across stamps.
     std::vector<uint8_t> _stamp_buf;

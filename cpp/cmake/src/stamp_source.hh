@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <string>
 
 namespace guider {
 
@@ -23,6 +24,13 @@ struct StampMetadata
     // This is the per-frame grouping key downstream code uses to assemble
     // the combined offset.
     std::uint32_t stamp_index = 0;
+
+    // Printable sensor name from GDS::Location::encode() (the raft / bay /
+    // board / sensor string for the producing sensor).
+    std::string sensor_name;
+
+    // ROI segment (amplifier) for this sensor's series.
+    std::uint16_t segment = 0;
 };
 
 struct Stamp

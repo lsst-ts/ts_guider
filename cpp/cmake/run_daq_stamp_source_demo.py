@@ -127,6 +127,9 @@ def on_stamp(pixels: np.ndarray, metadata: guiderGDS.StampMetadata) -> None:
     print(
         f"pixels.shape: {pixels.shape}, "
         f"pixels.max: {int(pixels.max())}, "
+        f"sensor_index: {metadata.sensor_index}, "
+        f"sensor_name: {metadata.sensor_name}, "
+        f"segment: {metadata.segment}, "
         f"metadata: {metadata}"
     )
     received.append(metadata)

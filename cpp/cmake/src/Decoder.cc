@@ -28,6 +28,7 @@ Guider::Decoder::Decoder(const char*              partition,
     {
         _stamps [i] = 0;
         _rstamps[i] = 0;
+        _segment[i] = 0;
     }
 }
 
@@ -41,6 +42,11 @@ void Guider::Decoder::start(const GDS::StateMetadata&  state,
     _n_cols      = series.common().ncols();
     _stamp_size  = series.common().pixels() * sizeof(int32_t);
     _rstamp_size = RawStamp::calc_size(series);
+
+    // The segment (amplifier) lives in the per-series ROI location, not in
+    // the per-stamp StateMetadata. Cache it per sensor so stamp() can attach
+    // it to every stamp of this series.
+    _segment[state.sensor().index()] = series.location().segment();
 
     _stamp_buf.resize(_stamp_size);
 }
@@ -128,6 +134,8 @@ void Guider::Decoder::stamp(const GDS::StateMetadata& state,
     our_stamp.metadata.sensor_index = state.sensor().index();
     our_stamp.metadata.sequence     = state.sequence();
     our_stamp.metadata.stamp_index  = state.stamp();
+    our_stamp.metadata.sensor_name  = state.sensor().encode();
+    our_stamp.metadata.segment      = _segment[state.sensor().index()];
 
     _on_stamp(our_stamp);
 }
