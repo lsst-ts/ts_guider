@@ -23,9 +23,13 @@
 
 This is the stamp-callback adapter shared by the CSC and the DAQ
 streaming demo. One :class:`SensorTracker` per ``sensor_index`` warms
-up, locks, then measures; the multi-sensor combine runs in
-:meth:`StreamingGuiderProcessor.finalize` after the stream stops, which
-keeps it independent of stamp delivery order.
+up, locks, then measures. Once locked, an acquisition (all sensors'
+measurements for one ``stamp_index``) is combined and emitted as soon
+as a later live ``stamp_index`` starts, so the combined offset is
+available live, frame by frame, while the stream runs. The seed
+warm-up frames (replayed in bulk at lock time, hence out of global
+order) and the final open frame are combined by :meth:`finalize` when
+the stream stops.
 """
 
 from __future__ import annotations
@@ -33,12 +37,14 @@ from __future__ import annotations
 __all__ = ["StreamingMetrics", "StreamingGuiderProcessor"]
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from time import perf_counter
 
 import numpy as np
 
 from .. import sensor_orientation
+from ..sensor_orientation import GuiderOrientation
 from .models import CombinedOffset, GuiderTrackerConfig
 from .offset_combiner import OffsetCombiner
 from .sensor_tracker import SensorTracker
@@ -84,7 +90,12 @@ class StreamingGuiderProcessor:
     """Per-stamp DAQ callback target reusing the offline pipeline.
 
     One ``SensorTracker`` per ``sensor_index``. Warms up, locks, then
-    measures; combine runs in :meth:`finalize` after the stream stops.
+    measures. Each locked acquisition is combined live, as soon as the
+    next live ``stamp_index`` starts (see :meth:`_maybe_combine_previous`);
+    pass ``on_combined_offset`` to be notified with each one as it is
+    produced (e.g. to publish telemetry or print a live trace).
+    :meth:`finalize` combines the seed warm-up frames and the final
+    open frame once the stream stops.
     """
 
     def __init__(
@@ -93,6 +104,8 @@ class StreamingGuiderProcessor:
         sensor_names: dict[int, str] | None = None,
         progress_interval: int = 0,
         sensor_amplifiers: dict[str, str] | None = None,
+        orientation: GuiderOrientation | None = None,
+        on_combined_offset: Callable[[CombinedOffset], None] | None = None,
     ):
         self.config = config
         self.sensor_names = sensor_names or {}
@@ -101,9 +114,12 @@ class StreamingGuiderProcessor:
         self.seed_buffers: dict[str, list[np.ndarray]] = {}
         self.seed_indices: dict[str, list[int]] = {}
         self.acquisitions: dict[int, dict[str, object]] = {}
-        self.combiner = OffsetCombiner(sensor_amplifiers)
+        self.combiner = OffsetCombiner(sensor_amplifiers, orientation)
         self.combined_offsets: list[CombinedOffset] = []
         self.metrics = StreamingMetrics()
+        self.on_combined_offset = on_combined_offset
+        self._latest_stamp_index: int | None = None
+        self._combined_indices: set[int] = set()
 
     def set_sensor_amplifiers(self, sensor_amplifiers: dict[str, str]) -> None:
         """Set the per-sensor amplifier map used for the camera combine.
@@ -131,6 +147,30 @@ class StreamingGuiderProcessor:
         except ValueError:
             return f"sensor_{sensor_index:02d}"
 
+    def _record_amplifier(self, sensor_name: str, metadata) -> None:
+        """Populate the per-sensor amplifier map from the stamp metadata.
+
+        The ROI segment (amplifier) is constant across a sensor's
+        series, so it is recorded once, the first time the sensor is
+        seen. This lets the camera-frame combine work in the live path
+        without any series configuration: the flip and rotation are
+        resolved from the camera model at combine time. An explicit map
+        supplied to the constructor is left untouched.
+
+        The GDS segment defaults to 0 (``C00``) until the series
+        ``start()`` caches the real value, so a stamp seen before its
+        start (e.g. a subscriber joining mid-series) can record ``C00``.
+        In practice ``start()`` precedes the sensor's stamps.
+        """
+        if sensor_name in self.combiner.sensor_amplifiers:
+            return
+        segment = getattr(metadata, "segment", None)
+        if segment is None:
+            return
+        self.combiner.sensor_amplifiers[sensor_name] = (
+            sensor_orientation.amplifier_name_from_segment_index(int(segment))
+        )
+
     @property
     def references(self) -> dict[str, tuple[float, float]]:
         return {
@@ -147,6 +187,7 @@ class StreamingGuiderProcessor:
             self.metrics.first_stamp_time = callback_start
 
         sensor_name = self._sensor_name(int(metadata.sensor_index))
+        self._record_amplifier(sensor_name, metadata)
         stamp_index = int(metadata.stamp_index)
         stamp = np.asarray(pixels, dtype=np.float32)
 
@@ -233,11 +274,18 @@ class StreamingGuiderProcessor:
             self.metrics.valid_measurements += 1
         else:
             self.metrics.invalid_measurements += 1
+        # Only live stamps (receipt_time set) drive the live combine.
+        # Seed-replay frames (receipt_time is None) arrive in bulk and
+        # out of global stamp order as each sensor locks, so combining
+        # on them would emit single-sensor offsets and drop the frames
+        # of later-locking sensors; finalize() combines them instead.
+        if receipt_time is not None:
+            self._maybe_combine_previous(stamp_index)
 
         if log.isEnabledFor(logging.DEBUG):
             # Per-sensor offset from the locked reference: this is the
-            # dx/dy available the instant measure() returns (the combined
-            # multi-sensor offset is produced later in finalize()).
+            # dx/dy available the instant measure() returns, ahead of
+            # the multi-sensor combine for this acquisition.
             reference_x, reference_y = tracker.reference_center
             offset_x = measurement.x - reference_x
             offset_y = measurement.y - reference_y
@@ -261,16 +309,63 @@ class StreamingGuiderProcessor:
                 elapsed_ms,
             )
 
+    def _maybe_combine_previous(self, stamp_index: int) -> None:
+        """Combine the previous acquisition once a newer live one starts.
+
+        Called only for live stamps (see :meth:`_measure_and_store`).
+        Once locked, sensors deliver a ``stamp_index`` in a tight burst
+        (all guide sensors, then the next index), so a higher live
+        ``stamp_index`` means the previous one is complete and can be
+        combined immediately instead of waiting for the stream to stop.
+        This is what makes the combined offset available live, frame by
+        frame.
+        """
+        if self._latest_stamp_index is None:
+            self._latest_stamp_index = stamp_index
+            return
+        if stamp_index <= self._latest_stamp_index:
+            return
+        previous_index = self._latest_stamp_index
+        self._latest_stamp_index = stamp_index
+        self._combine_acquisition(previous_index, notify=True)
+
+    def _combine_acquisition(self, stamp_index: int, notify: bool) -> None:
+        """Combine one acquisition, optionally notifying the callback.
+
+        ``notify`` fires ``on_combined_offset`` and is set for frames
+        completed live; :meth:`finalize` combines its trailing frames
+        with ``notify=False`` as end-of-stream cleanup.
+
+        A late measurement for an already-combined ``stamp_index``
+        (e.g. delivered out of order) reopens an entry in
+        ``self.acquisitions``; ``self._combined_indices`` guards against
+        combining it twice.
+        """
+        if stamp_index in self._combined_indices:
+            return
+        measurements = self.acquisitions.pop(stamp_index, None)
+        if not measurements:
+            return
+        combine_start = perf_counter()
+        combined = self.combiner.combine(stamp_index, measurements, self.references)
+        self.metrics.combine_times.append(perf_counter() - combine_start)
+        self.combined_offsets.append(combined)
+        self._combined_indices.add(stamp_index)
+        if notify and self.on_combined_offset is not None:
+            self.on_combined_offset(combined)
+
     def finalize(self) -> None:
-        """Combine grouped measurements into per-acquisition offsets."""
-        references = self.references
-        self.combined_offsets = []
+        """Combine the acquisitions still pending when the stream
+        stopped - the seed warm-up frames and the final open frame -
+        then order the record by ``stamp_index``.
+
+        These trailing combines do not fire ``on_combined_offset``:
+        that callback reports frames completed live while streaming,
+        whereas finalize is end-of-stream cleanup.
+        """
         for stamp_index in sorted(self.acquisitions):
-            measurements = self.acquisitions[stamp_index]
-            combine_start = perf_counter()
-            combined = self.combiner.combine(stamp_index, measurements, references)
-            self.metrics.combine_times.append(perf_counter() - combine_start)
-            self.combined_offsets.append(combined)
+            self._combine_acquisition(stamp_index, notify=False)
+        self.combined_offsets.sort(key=lambda offset: offset.stamp_index)
 
     def report(self) -> None:
         metrics = self.metrics
@@ -303,20 +398,63 @@ class StreamingGuiderProcessor:
                 f"({rate:.1f} stamps/s delivered)"
             )
 
+        self._report_combined_offset()
+
+    def _report_combined_offset(self) -> None:
+        """Print the combined-offset summary for the run.
+
+        Reports the frame the combine ran in (camera vs amplifier), the
+        run-level offset with its uncertainty, how much the sensors
+        disagreed, and the most recent per-acquisition offsets so the
+        individual combined results are visible next to the aggregates.
+        """
         valid = [c for c in self.combined_offsets if c.n_valid > 0]
-        if valid:
-            dx = np.array([c.combined_dx for c in valid])
-            dy = np.array([c.combined_dy for c in valid])
-            error_dx = np.array([c.error_dx for c in valid])
-            error_dy = np.array([c.error_dy for c in valid])
-            n_valid = np.array([c.n_valid for c in valid])
+        if not valid:
             print(
-                "\n--- combined offset (pixels) ---\n"
-                f"acquisitions with >=1 valid sensor: "
-                f"{len(valid)}/{len(self.combined_offsets)}\n"
-                f"dx: median={np.median(dx):+.3f} rms={np.std(dx):.3f} px\n"
-                f"dy: median={np.median(dy):+.3f} rms={np.std(dy):.3f} px\n"
-                f"median error dx: {np.nanmedian(error_dx):.3f} px\n"
-                f"median error dy: {np.nanmedian(error_dy):.3f} px\n"
-                f"mean sensors per acquisition: {n_valid.mean():.1f}"
+                "\n--- combined offset ---\n"
+                "no acquisition had a valid sensor; nothing combined."
+            )
+            return
+
+        amplifier_map = self.combiner.sensor_amplifiers
+        camera_frame = bool(amplifier_map)
+        dx = np.array([c.combined_dx for c in valid])
+        dy = np.array([c.combined_dy for c in valid])
+        error_dx = np.array([c.error_dx for c in valid])
+        error_dy = np.array([c.error_dy for c in valid])
+        scatter_dx = np.array([c.scatter_dx for c in valid])
+        scatter_dy = np.array([c.scatter_dy for c in valid])
+        n_valid = np.array([c.n_valid for c in valid])
+
+        print(
+            "\n--- combined offset (pixels) ---\n"
+            f"combine frame        : "
+            f"{'camera' if camera_frame else 'amplifier'}\n"
+            f"acquisitions combined: {len(valid)}/"
+            f"{len(self.combined_offsets)} with >=1 valid sensor\n"
+            f"sensors per acq      : mean {n_valid.mean():.1f}, "
+            f"min {n_valid.min()}, max {n_valid.max()}\n"
+            f"overall dx           : {np.median(dx):+.3f} "
+            f"+/- {np.nanmedian(error_dx):.3f} px "
+            f"(rms over acqs {np.std(dx):.3f})\n"
+            f"overall dy           : {np.median(dy):+.3f} "
+            f"+/- {np.nanmedian(error_dy):.3f} px "
+            f"(rms over acqs {np.std(dy):.3f})\n"
+            f"sensor disagreement  : median scatter "
+            f"dx {np.nanmedian(scatter_dx):.3f}, "
+            f"dy {np.nanmedian(scatter_dy):.3f} px"
+        )
+        if camera_frame:
+            amp_str = ", ".join(
+                f"{name}:{amplifier_map[name]}" for name in sorted(amplifier_map)
+            )
+            print(f"per-sensor amplifier : {amp_str}")
+
+        print("\nlast acquisitions (idx: dx +/- err, dy +/- err, sensors):")
+        for offset in valid[-5:]:
+            print(
+                f"  {offset.stamp_index:6d}: "
+                f"dx={offset.combined_dx:+.3f} +/- {offset.error_dx:.3f}  "
+                f"dy={offset.combined_dy:+.3f} +/- {offset.error_dy:.3f}  "
+                f"({offset.n_valid}/{offset.n_total})"
             )

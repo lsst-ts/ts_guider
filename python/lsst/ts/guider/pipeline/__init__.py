@@ -24,7 +24,10 @@
 The per-sensor centroiding and multi-sensor combine, shared by the
 offline FITS driver, the DAQ streaming demo, and the Guider CSC. The
 modules depend only on numpy/galsim/scipy/astropy (no salobj), so the
-algorithm can be imported and exercised without the CSC.
+algorithm can be imported and exercised without the CSC. The
+camera-frame combine additionally reads the LSST camera model
+(``lsst.obs.lsst``) at runtime, imported lazily so importing the
+pipeline never requires the stack.
 """
 
 from .batch import MultiSensorRunner, run_offline

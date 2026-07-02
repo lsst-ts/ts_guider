@@ -21,18 +21,22 @@ Stamps arrive asynchronously as ``on_stamp(pixels, metadata)`` keyed by
 buffers its first ``seed_frames`` stamps, locks a reference, then
 measures every stamp (the buffered seed frames are measured at lock
 time so coverage matches the offline run). Measurements are grouped by
-``stamp_index``; the per-acquisition combine runs after the stream
-stops, which keeps it independent of stamp delivery order.
+``stamp_index``; once a sensor is locked, each acquisition (one
+``stamp_index`` across sensors) is combined live as soon as the next
+live one starts, so pass ``--per-frame`` to print the combined offset
+frame by frame as the stream runs. The seed warm-up frames and the
+final open frame are combined in ``finalize()`` (they do not appear in
+the live ``--per-frame`` trace, only in the end-of-run report).
 
 Sensor orientation
 ------------------
 Centroiding stays in amplifier (ROI) coordinates. Before the combine
 averages the per-sensor offsets, each is rotated into the common camera
 frame (amplifier flip + detector ``nQuarter``) using the per-sensor
-amplifier map. The per-stamp ``StampMetadata`` now carries the
-``segment``, so the amplifier map can be populated from it; until
-``run_live`` wires that (see the TODO there) the live combine falls
-back to amplifier coordinates.
+amplifier map. The map is built automatically from the per-stamp
+``StampMetadata.segment`` the first time each sensor is seen (see
+``StreamingGuiderProcessor._record_amplifier``), so the live combine
+runs in the camera frame with no extra configuration.
 
 Run (inside the container)
 ---------------------------
@@ -57,11 +61,29 @@ import threading
 from time import perf_counter
 
 from lsst.ts.guider.pipeline import (
+    CombinedOffset,
     GuiderTrackerConfig,
     StreamingGuiderProcessor,
 )
 
 log = logging.getLogger("guider_pipeline")
+
+
+def print_combined_offset(combined: CombinedOffset) -> None:
+    """Print one acquisition's combined offset as soon as it is ready.
+
+    Registered as ``StreamingGuiderProcessor.on_combined_offset`` when
+    ``--per-frame`` is set, so this runs live, frame by frame, while
+    the stream is still running (see the "Streaming model" section in
+    the module docstring).
+    """
+    print(
+        f"{combined.stamp_index:6d} | "
+        f"dx={combined.combined_dx:+.3f} +/- {combined.error_dx:.3f} | "
+        f"dy={combined.combined_dy:+.3f} +/- {combined.error_dy:.3f} | "
+        f"scatter {combined.scatter_dx:.3f},{combined.scatter_dy:.3f} | "
+        f"{combined.n_valid}/{combined.n_total}"
+    )
 
 
 def run_live(
@@ -79,20 +101,6 @@ def run_live(
     handled promptly.
     """
     import guiderGDS
-
-    # TODO: populate the per-sensor amplifier map for the camera-frame
-    # combine from the per-stamp metadata.segment (now exposed by the
-    # binding) via processor.set_sensor_amplifiers(). The flip and
-    # rotation are applied together, so without the map no camera-frame
-    # transform is applied and the combine averages in amplifier
-    # coordinates.
-    if not processor.combiner.sensor_amplifiers:
-        log.warning(
-            "Live combine has no per-sensor amplifier map (ROI segment); "
-            "offsets are averaged in amplifier coordinates without the "
-            "camera-frame transform. Sensor names are decoded so the "
-            "transform activates once the map is set."
-        )
 
     source = guiderGDS.DaqStampSource(
         partition=partition,
@@ -149,6 +157,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Log a running summary every N stamps; 0 disables it.",
     )
     parser.add_argument(
+        "--per-frame",
+        action="store_true",
+        help="Print the combined offset for every acquisition (frame) "
+        "live, as the stream runs, not just the final run summary.",
+    )
+    parser.add_argument(
         "--debug",
         action="store_true",
         help="Log every measured stamp (centroid, snr, pass/reject).",
@@ -167,7 +181,13 @@ def main(argv: list[str] | None = None) -> int:
         level = logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
     config = GuiderTrackerConfig(seed_frames=args.seed_frames, min_snr=args.min_snr)
-    processor = StreamingGuiderProcessor(config, progress_interval=args.progress)
+    processor = StreamingGuiderProcessor(
+        config,
+        progress_interval=args.progress,
+        on_combined_offset=print_combined_offset if args.per_frame else None,
+    )
+    if args.per_frame:
+        print("   idx |        dx +/- err |        dy +/- err | scatter | sensors")
 
     run_live(processor, args.partition, args.max_stamps, args.timeout)
 

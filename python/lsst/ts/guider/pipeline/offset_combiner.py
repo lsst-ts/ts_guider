@@ -42,11 +42,11 @@ class OffsetCombiner:
     (stamp) pixels. When a per-sensor amplifier map is supplied, every
     offset is first rotated into the common camera frame (amplifier
     flip + detector ``nQuarter``) via
-    :func:`sensor_orientation.amplifier_to_camera_offset`, so the
-    average is taken in a single orientation - the transform described
-    at the 2026-04-22 meeting. Without that map the offsets are
-    averaged in amplifier coordinates as before (only valid when all
-    sensors already share an orientation).
+    :meth:`sensor_orientation.GuiderOrientation.amplifier_to_camera_offset`,
+    so the average is taken in a single orientation - the transform
+    described at the 2026-04-22 meeting. Without that map the offsets
+    are averaged in amplifier coordinates (only valid when all sensors
+    already share an orientation).
 
     Parameters
     ----------
@@ -54,10 +54,21 @@ class OffsetCombiner:
         Map of sensor name (e.g. ``"R00_SG0"``) to the amplifier its
         ROI sits on (e.g. ``"C05"``). Sensors absent from the map, or
         an unset map, are left in amplifier coordinates.
+    orientation : `sensor_orientation.GuiderOrientation`, optional
+        Source of the per-sensor flip and rotation, read from the LSST
+        camera model. Defaults to a fresh :class:`GuiderOrientation`
+        (which builds the camera lazily on the first camera-frame
+        transform). Pass a shared instance to reuse one camera across
+        drivers.
     """
 
-    def __init__(self, sensor_amplifiers: dict[str, str] | None = None):
+    def __init__(
+        self,
+        sensor_amplifiers: dict[str, str] | None = None,
+        orientation: sensor_orientation.GuiderOrientation | None = None,
+    ):
         self.sensor_amplifiers = sensor_amplifiers or {}
+        self.orientation = orientation or sensor_orientation.GuiderOrientation()
 
     def combine(
         self,
@@ -122,19 +133,19 @@ class OffsetCombiner:
         """Rotate one offset into the camera frame when possible.
 
         Falls back to the amplifier-frame offset if no amplifier is
-        known for the sensor, or the sensor/amplifier is not in the
-        orientation tables.
+        known for the sensor, or the camera model has no such
+        sensor/amplifier.
         """
         amplifier_name = self.sensor_amplifiers.get(sensor_name)
         if amplifier_name is None:
             return offset_x, offset_y
         try:
-            return sensor_orientation.amplifier_to_camera_offset(
+            return self.orientation.amplifier_to_camera_offset(
                 offset_x, offset_y, sensor_name, amplifier_name
             )
-        except KeyError:
+        except LookupError:
             log.warning(
-                "No orientation entry for sensor '%s' amplifier '%s'; "
+                "Camera model has no sensor '%s' amplifier '%s'; "
                 "leaving its offset in amplifier coordinates.",
                 sensor_name,
                 amplifier_name,

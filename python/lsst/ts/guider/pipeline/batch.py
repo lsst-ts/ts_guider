@@ -37,6 +37,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ..sensor_orientation import GuiderOrientation
 from .fits_io import read_guider_sequence
 from .models import CentroidMeasurement, CombinedOffset, GuiderTrackerConfig
 from .offset_combiner import OffsetCombiner, build_sensor_amplifiers
@@ -53,10 +54,11 @@ class MultiSensorRunner:
         sensor_names: list[str],
         config: GuiderTrackerConfig,
         sensor_amplifiers: dict[str, str] | None = None,
+        orientation: GuiderOrientation | None = None,
     ):
         self.config = config
         self.trackers = {name: SensorTracker(name, config) for name in sensor_names}
-        self.combiner = OffsetCombiner(sensor_amplifiers)
+        self.combiner = OffsetCombiner(sensor_amplifiers, orientation)
 
     def lock_references(
         self, seed_stamps_by_sensor: dict[str, np.ndarray]
