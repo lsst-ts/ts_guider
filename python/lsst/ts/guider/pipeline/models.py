@@ -48,6 +48,12 @@ class GuiderTrackerConfig:
     n_pix_min: int = 10
     min_snr: float = 10.0
     max_ellipticity: float = 0.7
+    # TBD: is this a good idea?
+    # TBD: Make it configurable?
+    # Reject sources wider than a star (blends, galaxies, hot columns)
+    # even when they are bright enough to pass the SNR cut. Guide-star
+    # FWHM is a few pixels; a lock at tens of pixels is not a star.
+    max_fwhm: float = 15.0
     min_valid_stamp_fraction: float = 0.5
 
 

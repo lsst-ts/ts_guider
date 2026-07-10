@@ -219,12 +219,15 @@ class SensorTracker:
         return flux / flux_error if flux_error > 0 else 0.0
 
     def _passes_quality(self, measurement: CentroidMeasurement) -> bool:
-        """Apply the summit-style SNR, ellipticity and edge cuts."""
+        """Apply the SNR, ellipticity, size and edge quality cuts."""
         if not measurement.is_finite:
             return False
         if measurement.snr < self.config.min_snr:
             return False
         if np.hypot(measurement.e1, measurement.e2) > self.config.max_ellipticity:
+            return False
+        # TBD: is this a good idea? star rejection.
+        if np.isfinite(measurement.fwhm) and measurement.fwhm > self.config.max_fwhm:
             return False
         if self.stamp_shape is None:
             return True

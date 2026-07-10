@@ -1,13 +1,11 @@
 """End-to-end guider pipeline over the DAQ/SDK stamp source.
 
 This wires the tracking pipeline (``lsst.ts.guider.pipeline``) to the
-live DAQ/GDS stamp stream exposed by ``guiderGDS.DaqStampSource``. It is
-the intermediate step between the standalone FITS analysis
-(``ts_guider/scripts/guider_offline.py``) and the CSC: the *same*
-``StreamingGuiderProcessor`` (``SensorTracker`` / ``OffsetCombiner``)
-algorithm, now fed one stamp at a time from the C++ worker thread, plus
-timing metrics on the real-time-critical path (per-stamp HSM
-measurement) and the cheaper post-stream combine.
+live DAQ/GDS stamp stream exposed by ``guiderGDS.DaqStampSource``. It
+runs the same ``StreamingGuiderProcessor`` (``SensorTracker`` /
+``OffsetCombiner``) the CSC uses, fed one stamp at a time from the C++
+worker thread, plus timing metrics on the real-time-critical path
+(per-stamp HSM measurement) and the cheaper post-stream combine.
 
 Subscribes to a GDS partition exactly like ``run_daq_stamp_source_demo.py``.
 Requires the 3-terminal emulator setup documented in that file
@@ -20,13 +18,18 @@ Stamps arrive asynchronously as ``on_stamp(pixels, metadata)`` keyed by
 ``metadata.sensor_index`` and ``metadata.stamp_index``. Each sensor
 buffers its first ``seed_frames`` stamps, locks a reference, then
 measures every stamp (the buffered seed frames are measured at lock
-time so coverage matches the offline run). Measurements are grouped by
+time so coverage includes the warm-up stamps). Measurements are grouped by
 ``stamp_index``; once a sensor is locked, each acquisition (one
 ``stamp_index`` across sensors) is combined live as soon as the next
 live one starts, so pass ``--per-frame`` to print the combined offset
 frame by frame as the stream runs. The seed warm-up frames and the
 final open frame are combined in ``finalize()`` (they do not appear in
 the live ``--per-frame`` trace, only in the end-of-run report).
+
+A change in ``metadata.sequence`` marks a new pointing: the processor
+ends the finished visit and re-acquires on the new field's guide stars.
+The demo prints a per-visit summary at each boundary (and for the last
+visit at ``finalize()``).
 
 Sensor orientation
 ------------------
@@ -60,6 +63,7 @@ import sys
 import threading
 from time import perf_counter
 
+import numpy as np
 from lsst.ts.guider.pipeline import (
     CombinedOffset,
     GuiderTrackerConfig,
@@ -83,6 +87,42 @@ def print_combined_offset(combined: CombinedOffset) -> None:
         f"dy={combined.combined_dy:+.3f} +/- {combined.error_dy:.3f} | "
         f"scatter {combined.scatter_dx:.3f},{combined.scatter_dy:.3f} | "
         f"{combined.n_valid}/{combined.n_total}"
+    )
+
+
+def print_visit_start(sequence: int | None, label: str) -> None:
+    """Print a banner at the first stamp of each visit.
+
+    Registered as ``StreamingGuiderProcessor.on_visit_start``, so it
+    fires once per pointing before that visit's live per-frame trace,
+    making it unambiguous which sequence/image the following rows
+    belong to.
+    """
+    print(f"\n>>> visit start: sequence {sequence} " f"image '{label or '?'}' <<<")
+
+
+def print_visit_summary(sequence: int | None, offsets: list[CombinedOffset]) -> None:
+    """Print a per-visit summary when a pointing ends.
+
+    Registered as ``StreamingGuiderProcessor.on_visit_complete``, so it
+    fires at each sequence boundary (telescope slew) and once more for
+    the final visit at ``finalize()``.
+    """
+    valid = [offset for offset in offsets if offset.n_valid > 0]
+    if not valid:
+        print(f"\n=== visit (sequence {sequence}) complete: no valid offsets ===")
+        return
+    dx = np.array([offset.combined_dx for offset in valid])
+    dy = np.array([offset.combined_dy for offset in valid])
+    error_dx = np.array([offset.error_dx for offset in valid])
+    error_dy = np.array([offset.error_dy for offset in valid])
+    print(
+        f"\n=== visit (sequence {sequence}) complete ===\n"
+        f"acquisitions   : {len(valid)}/{len(offsets)} with >=1 valid sensor\n"
+        f"overall dx     : {np.median(dx):+.3f} "
+        f"+/- {np.nanmedian(error_dx):.3f} px\n"
+        f"overall dy     : {np.median(dy):+.3f} "
+        f"+/- {np.nanmedian(error_dy):.3f} px"
     )
 
 
@@ -147,7 +187,14 @@ def _build_parser() -> argparse.ArgumentParser:
         default=100.0,
         help="Seconds to wait for stamps; 0 waits forever (stop with Ctrl-C).",
     )
-    parser.add_argument("--seed-frames", type=int, default=30)
+    parser.add_argument(
+        "--seed-frames",
+        type=int,
+        default=GuiderTrackerConfig.seed_frames,
+        help="Warm-up stamps buffered per sensor before locking a "
+        "reference; the single default lives on GuiderTrackerConfig. "
+        "Lower it (e.g. 10 or 5) for short visits.",
+    )
     parser.add_argument("--min-snr", type=float, default=10.0)
     parser.add_argument(
         "--progress",
@@ -185,6 +232,8 @@ def main(argv: list[str] | None = None) -> int:
         config,
         progress_interval=args.progress,
         on_combined_offset=print_combined_offset if args.per_frame else None,
+        on_visit_start=print_visit_start if args.per_frame else None,
+        on_visit_complete=print_visit_summary,
     )
     if args.per_frame:
         print("   idx |        dx +/- err |        dy +/- err | scatter | sensors")

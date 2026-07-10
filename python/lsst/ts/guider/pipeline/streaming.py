@@ -30,6 +30,16 @@ available live, frame by frame, while the stream runs. The seed
 warm-up frames (replayed in bulk at lock time, hence out of global
 order) and the final open frame are combined by :meth:`finalize` when
 the stream stops.
+
+Rubin observes one field, then slews to the next; each pointing is a
+separate DAQ series carrying its own ``metadata.sequence`` and its own
+guide stars. When the sequence changes the tracked stars are no longer
+valid, so the processor ends the finished visit (combining its last
+open acquisition) and resets its per-visit state - trackers,
+references, seed buffers and per-``stamp_index`` bookkeeping - so the
+new field re-seeds and re-locks from scratch. ``stamp_index`` restarts
+each series, so this reset is also what keeps the live combine trigger
+and the duplicate guard correct across the boundary.
 """
 
 from __future__ import annotations
@@ -37,6 +47,7 @@ from __future__ import annotations
 __all__ = ["StreamingMetrics", "StreamingGuiderProcessor"]
 
 import logging
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from time import perf_counter
@@ -87,7 +98,7 @@ def summarize_milliseconds(durations: list[float]) -> str:
 
 
 class StreamingGuiderProcessor:
-    """Per-stamp DAQ callback target reusing the offline pipeline.
+    """Per-stamp DAQ callback target for guide-star tracking.
 
     One ``SensorTracker`` per ``sensor_index``. Warms up, locks, then
     measures. Each locked acquisition is combined live, as soon as the
@@ -96,6 +107,15 @@ class StreamingGuiderProcessor:
     produced (e.g. to publish telemetry or print a live trace).
     :meth:`finalize` combines the seed warm-up frames and the final
     open frame once the stream stops.
+
+    A change in ``metadata.sequence`` marks a new pointing; the finished
+    visit is ended and the per-visit state reset so the new field
+    re-acquires (see :meth:`_maybe_start_new_visit`). Pass
+    ``on_visit_start`` to be notified with ``(sequence, label)`` at the
+    first stamp of each visit (e.g. to print a banner grouping the live
+    trace), and ``on_visit_complete`` to be notified with
+    ``(sequence, offsets)`` when each visit ends, where ``offsets`` are
+    that visit's combined offsets (e.g. to publish a per-visit summary).
     """
 
     def __init__(
@@ -106,6 +126,10 @@ class StreamingGuiderProcessor:
         sensor_amplifiers: dict[str, str] | None = None,
         orientation: GuiderOrientation | None = None,
         on_combined_offset: Callable[[CombinedOffset], None] | None = None,
+        on_visit_start: Callable[[int | None, str], None] | None = None,
+        on_visit_complete: (
+            Callable[[int | None, list[CombinedOffset]], None] | None
+        ) = None,
     ):
         self.config = config
         self.sensor_names = sensor_names or {}
@@ -118,27 +142,47 @@ class StreamingGuiderProcessor:
         self.combined_offsets: list[CombinedOffset] = []
         self.metrics = StreamingMetrics()
         self.on_combined_offset = on_combined_offset
+        self.on_visit_start = on_visit_start
+        self.on_visit_complete = on_visit_complete
+        self._visit_start_notified = False
         self._latest_stamp_index: int | None = None
         self._combined_indices: set[int] = set()
+        self._current_sequence: int | None = None
+        # Per-visit diagnostics, not the boundary trigger: each sensor's
+        # ROI key (segment, startrow, startcol) and the image/series
+        # label from the stamp metadata. The sequence is the trigger; a
+        # new START always advances it (per Gregg slack comment, 2026-07-06),
+        # even when the ROI parameters repeat.
+        self.sensor_rois: dict[str, tuple[int, int, int]] = {}
+        self.visit_label = ""
+        # Index into combined_offsets where the current visit's offsets
+        # begin, so a visit can be summarized without a separate list.
+        self._visit_start = 0
+        # An explicitly supplied map is a fixed configuration and is
+        # kept across visits; an auto-populated one is cleared on each
+        # new visit so the new series repopulates it from its segments.
+        self._amplifier_map_is_explicit = sensor_amplifiers is not None
 
     def set_sensor_amplifiers(self, sensor_amplifiers: dict[str, str]) -> None:
         """Set the per-sensor amplifier map used for the camera combine.
 
         Populated from the ROI configuration (segment per sensor). With
         it the per-acquisition combine runs in the camera frame; without
-        it the combine stays in amplifier coordinates.
+        it the combine stays in amplifier coordinates. A map set here is
+        treated as explicit configuration and kept across visits.
         """
         self.combiner.sensor_amplifiers = sensor_amplifiers
+        self._amplifier_map_is_explicit = True
 
     def _sensor_name(self, sensor_index: int) -> str:
         """Resolve a sensor name for a GDS ``sensor_index``.
 
-        Replay supplies explicit names from the FITS headers. Live has
-        only the packed index, so it is decoded to the detector name
-        (e.g. ``R40_SG0``) - the key the orientation tables use. This
-        makes per-sensor names meaningful in the live logs and lets the
-        camera-frame transform resolve once the per-sensor amplifier
-        map is provided (the camera combine still needs that map).
+        The stream carries only the packed index, so it is decoded to
+        the detector name (e.g. ``R40_SG0``) - the key the orientation
+        tables use. This makes per-sensor names meaningful in the logs
+        and lets the camera-frame transform resolve once the per-sensor
+        amplifier map is provided (the camera combine still needs that
+        map). An explicit name map, if supplied, takes precedence.
         """
         if sensor_index in self.sensor_names:
             return self.sensor_names[sensor_index]
@@ -171,6 +215,58 @@ class StreamingGuiderProcessor:
             sensor_orientation.amplifier_name_from_segment_index(int(segment))
         )
 
+    def _record_roi(self, sensor_name: str, metadata) -> None:
+        """Record the sensor's ROI key and visit label, for diagnostics.
+
+        The visit boundary is triggered by the sequence, not by these:
+        a new START always advances the sequence, even when it repeats
+        the same ROI parameters. The ROI key is logged once per sensor
+        per visit; a mid-visit change without a sequence change should
+        be impossible, so it is logged as a warning if it ever happens.
+        """
+        segment = getattr(metadata, "segment", None)
+        startrow = getattr(metadata, "startrow", None)
+        startcol = getattr(metadata, "startcol", None)
+        if segment is None or startrow is None or startcol is None:
+            return
+        roi_key = (int(segment), int(startrow), int(startcol))
+        known = self.sensor_rois.get(sensor_name)
+        if known is None:
+            self.sensor_rois[sensor_name] = roi_key
+            log.info(
+                "%s ROI: segment=%d startrow=%d startcol=%d",
+                sensor_name,
+                *roi_key,
+            )
+        elif known != roi_key:
+            log.warning(
+                "%s ROI changed mid-visit without a sequence change: "
+                "%s -> %s. Boundary may have been missed.",
+                sensor_name,
+                known,
+                roi_key,
+            )
+            self.sensor_rois[sensor_name] = roi_key
+
+        if not self.visit_label:
+            self.visit_label = str(
+                getattr(metadata, "obs_id", "") or getattr(metadata, "series_id", "")
+            )
+
+    def _maybe_notify_visit_start(self) -> None:
+        """Fire ``on_visit_start`` once, at the first stamp of a visit.
+
+        Called after :meth:`_record_roi` so the image/series label is
+        available. Firing here rather than at the sequence boundary
+        means the first visit (which has no preceding boundary) is
+        announced too, and the label is populated by the time it fires.
+        """
+        if self._visit_start_notified:
+            return
+        self._visit_start_notified = True
+        if self.on_visit_start is not None:
+            self.on_visit_start(self._current_sequence, self.visit_label)
+
     @property
     def references(self) -> dict[str, tuple[float, float]]:
         return {
@@ -186,8 +282,12 @@ class StreamingGuiderProcessor:
         if self.metrics.first_stamp_time is None:
             self.metrics.first_stamp_time = callback_start
 
+        self._maybe_start_new_visit(int(getattr(metadata, "sequence", 0)))
+
         sensor_name = self._sensor_name(int(metadata.sensor_index))
         self._record_amplifier(sensor_name, metadata)
+        self._record_roi(sensor_name, metadata)
+        self._maybe_notify_visit_start()
         stamp_index = int(metadata.stamp_index)
         stamp = np.asarray(pixels, dtype=np.float32)
 
@@ -354,18 +454,88 @@ class StreamingGuiderProcessor:
         if notify and self.on_combined_offset is not None:
             self.on_combined_offset(combined)
 
-    def finalize(self) -> None:
-        """Combine the acquisitions still pending when the stream
-        stopped - the seed warm-up frames and the final open frame -
-        then order the record by ``stamp_index``.
+    def _maybe_start_new_visit(self, sequence: int) -> None:
+        """Detect a new guide series and re-acquire.
 
-        These trailing combines do not fire ``on_combined_offset``:
-        that callback reports frames completed live while streaming,
-        whereas finalize is end-of-stream cleanup.
+        The sequence advances on every START (per Gregg, 2026-07-06),
+        so a change means a new series: typically a slew to a new field
+        with new guide stars, but possibly a restart with the same ROI
+        parameters. Both cases require the reset - ``stamp_index``
+        restarts each series, and after a slew the old references point
+        at stars that are no longer there. The comparison is by
+        inequality, so the 16-bit sequence rollover is harmless. The
+        very first stamp only records the starting sequence.
+        """
+        if self._current_sequence is None:
+            self._current_sequence = sequence
+            return
+        if sequence == self._current_sequence:
+            return
+        self._end_visit()
+        self._reset_for_new_visit(sequence)
+
+    def _end_visit(self) -> None:
+        """Combine the finishing visit's pending acquisitions and notify.
+
+        The trailing acquisitions (seed warm-up frames, replayed in bulk
+        at lock time and hence out of global order, plus the final open
+        frame) are combined and the visit's slice of ``combined_offsets``
+        is ordered by ``stamp_index``. ``on_visit_complete`` is then
+        called with that visit's offsets. Trailing combines do not fire
+        ``on_combined_offset`` (that reports frames completed live).
         """
         for stamp_index in sorted(self.acquisitions):
             self._combine_acquisition(stamp_index, notify=False)
-        self.combined_offsets.sort(key=lambda offset: offset.stamp_index)
+        visit_offsets = self.combined_offsets[self._visit_start :]
+        visit_offsets.sort(key=lambda offset: offset.stamp_index)
+        self.combined_offsets[self._visit_start :] = visit_offsets
+        log.info(
+            "Visit complete: sequence=%s image='%s' "
+            "%d combined offsets from %d sensors.",
+            self._current_sequence,
+            self.visit_label,
+            len(visit_offsets),
+            len(self.sensor_rois),
+        )
+        if self.on_visit_complete is not None and visit_offsets:
+            self.on_visit_complete(self._current_sequence, visit_offsets)
+
+    def _reset_for_new_visit(self, sequence: int) -> None:
+        """Drop the finished visit's tracking state before re-acquiring.
+
+        ``combined_offsets`` and the lifetime metrics are kept (the run
+        report aggregates across visits); everything tied to the old
+        field's stars is cleared. Resetting ``_latest_stamp_index`` and
+        ``_combined_indices`` is required for correctness, not just
+        tidiness: ``stamp_index`` restarts each series, so without it the
+        new visit's low indices would never re-trigger the live combine
+        and would be skipped by the duplicate guard.
+        """
+        self.trackers.clear()
+        self.seed_buffers.clear()
+        self.seed_indices.clear()
+        self.acquisitions.clear()
+        self._latest_stamp_index = None
+        self._combined_indices.clear()
+        self._visit_start = len(self.combined_offsets)
+        self._current_sequence = sequence
+        self.sensor_rois.clear()
+        self.visit_label = ""
+        self._visit_start_notified = False
+        if not self._amplifier_map_is_explicit:
+            self.combiner.sensor_amplifiers = {}
+
+    def finalize(self) -> None:
+        """End the final visit once the stream stops.
+
+        Equivalent to a sequence boundary with no next series: the last
+        visit's trailing acquisitions (seed warm-up frames and the final
+        open frame) are combined and ``on_visit_complete`` fires for it.
+        The stream can stop on a rough shutdown, so flush stdout to keep
+        any callback output that the block buffer has not written yet.
+        """
+        self._end_visit()
+        sys.stdout.flush()
 
     def report(self) -> None:
         metrics = self.metrics
@@ -399,6 +569,7 @@ class StreamingGuiderProcessor:
             )
 
         self._report_combined_offset()
+        sys.stdout.flush()
 
     def _report_combined_offset(self) -> None:
         """Print the combined-offset summary for the run.

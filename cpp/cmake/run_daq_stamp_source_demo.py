@@ -109,8 +109,8 @@ import guiderGDS
 import numpy as np
 
 PARTITION = "gds-emu"
-MAX_STAMPS = 400
-TIMEOUT_SECONDS = 100.0
+MAX_STAMPS = 40000
+TIMEOUT_SECONDS = 1000.0
 
 locations = guiderGDS.LocationSet.any()
 
@@ -130,6 +130,11 @@ def on_stamp(pixels: np.ndarray, metadata: guiderGDS.StampMetadata) -> None:
         f"sensor_index: {metadata.sensor_index}, "
         f"sensor_name: {metadata.sensor_name}, "
         f"segment: {metadata.segment}, "
+        f"startrow: {metadata.startrow}, "
+        f"startcol: {metadata.startcol}, "
+        f"obs_id: {metadata.obs_id!r}, "
+        f"series_id: {metadata.series_id!r}, "
+        f"sequence: {metadata.sequence}, "
         f"metadata: {metadata}"
     )
     received.append(metadata)

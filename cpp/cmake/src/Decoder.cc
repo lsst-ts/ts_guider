@@ -26,9 +26,11 @@ Guider::Decoder::Decoder(const char*              partition,
 {
     for (int i = 0; i < Set::SIZE; ++i)
     {
-        _stamps [i] = 0;
-        _rstamps[i] = 0;
-        _segment[i] = 0;
+        _stamps  [i] = 0;
+        _rstamps [i] = 0;
+        _segment [i] = 0;
+        _startrow[i] = 0;
+        _startcol[i] = 0;
     }
 }
 
@@ -43,10 +45,23 @@ void Guider::Decoder::start(const GDS::StateMetadata&  state,
     _stamp_size  = series.common().pixels() * sizeof(int32_t);
     _rstamp_size = RawStamp::calc_size(series);
 
-    // The segment (amplifier) lives in the per-series ROI location, not in
-    // the per-stamp StateMetadata. Cache it per sensor so stamp() can attach
-    // it to every stamp of this series.
-    _segment[state.sensor().index()] = series.location().segment();
+    // The segment (amplifier) and window origin live in the per-series ROI
+    // location, not in the per-stamp StateMetadata. Cache them per sensor so
+    // stamp() can attach them to every stamp of this series; downstream they
+    // form the (segment, startrow, startcol) key that detects an ROI change.
+    _segment [state.sensor().index()] = series.location().segment();
+    _startrow[state.sensor().index()] = series.location().startrow();
+    _startcol[state.sensor().index()] = series.location().startcol();
+
+    // The series id lives in the per-series metadata. A series (start) is a
+    // set of ROI parameters (tied to initGuider), not an image: per Gregg
+    // (2026-07-06) CCS does not yet know the image name at initGuider, and
+    // one ROI can host multiple images. So series.id() is the ROI/config
+    // identity, not the image name; the image name arrives on resume().
+    // Cache it per sensor and clear the stale image name until resume()
+    // supplies the new one.
+    _series_id[state.sensor().index()] = series.id();
+    _obs_id   [state.sensor().index()].clear();
 
     _stamp_buf.resize(_stamp_size);
 }
@@ -55,6 +70,12 @@ void Guider::Decoder::resume(const GDS::StateMetadata& state)
 {
     state.dump();
 
+    // The image name (OBSID) travels on the resume command's comment, not
+    // the series metadata (per Gregg, 2026-07-06). A new resume within the
+    // same ROI series means a new image, so cache it per sensor here; stamp()
+    // attaches it to every stamp and downstream code triggers a new coadd
+    // when it changes.
+    _obs_id [state.sensor().index()] = state.comment();
     _begin  [state.sensor().index()] = state.timestamp();
     _stamps [state.sensor().index()] = 0;
     _rstamps[state.sensor().index()] = 0;
@@ -136,6 +157,10 @@ void Guider::Decoder::stamp(const GDS::StateMetadata& state,
     our_stamp.metadata.stamp_index  = state.stamp();
     our_stamp.metadata.sensor_name  = state.sensor().encode();
     our_stamp.metadata.segment      = _segment[state.sensor().index()];
+    our_stamp.metadata.startrow     = _startrow[state.sensor().index()];
+    our_stamp.metadata.startcol     = _startcol[state.sensor().index()];
+    our_stamp.metadata.obs_id       = _obs_id[state.sensor().index()];
+    our_stamp.metadata.series_id    = _series_id[state.sensor().index()];
 
     _on_stamp(our_stamp);
 }
