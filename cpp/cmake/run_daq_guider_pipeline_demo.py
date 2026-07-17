@@ -21,7 +21,7 @@ measures every stamp (the buffered seed frames are measured at lock
 time so coverage includes the warm-up stamps). Measurements are grouped by
 ``stamp_index``; once a sensor is locked, each acquisition (one
 ``stamp_index`` across sensors) is combined live as soon as the next
-live one starts, so pass ``--per-frame`` to print the combined offset
+live one starts, so pass ``--per-frame`` to log the combined offset
 frame by frame as the stream runs. The seed warm-up frames and the
 final open frame are combined in ``finalize()`` (they do not appear in
 the live ``--per-frame`` trace, only in the end-of-run report).
@@ -61,6 +61,7 @@ import argparse
 import logging
 import sys
 import threading
+from collections.abc import Callable
 from time import perf_counter
 
 import numpy as np
@@ -73,36 +74,54 @@ from lsst.ts.guider.pipeline import (
 log = logging.getLogger("guider_pipeline")
 
 
-def print_combined_offset(combined: CombinedOffset) -> None:
-    """Print one acquisition's combined offset as soon as it is ready.
+def make_combined_offset_logger(
+    processor: StreamingGuiderProcessor,
+) -> Callable[[CombinedOffset], None]:
+    """Build the ``on_combined_offset`` callback for ``--per-frame``.
 
-    Registered as ``StreamingGuiderProcessor.on_combined_offset`` when
-    ``--per-frame`` is set, so this runs live, frame by frame, while
-    the stream is still running (see the "Streaming model" section in
-    the module docstring).
+    The returned callback logs one acquisition's combined offset as
+    soon as it is ready, so the combined dx/dy (the per-frame average
+    over the locked sensors, each ``+/-`` its standard error) appears
+    live, frame by frame, while the stream runs. The trailing time is
+    that frame's combine cost in milliseconds, read from
+    ``metrics.combine_times``: its last entry is appended right before
+    this callback fires (see
+    ``StreamingGuiderProcessor._combine_acquisition``).
     """
-    print(
-        f"{combined.stamp_index:6d} | "
-        f"dx={combined.combined_dx:+.3f} +/- {combined.error_dx:.3f} | "
-        f"dy={combined.combined_dy:+.3f} +/- {combined.error_dy:.3f} | "
-        f"scatter {combined.scatter_dx:.3f},{combined.scatter_dy:.3f} | "
-        f"{combined.n_valid}/{combined.n_total}"
-    )
+
+    def log_combined_offset(combined: CombinedOffset) -> None:
+        combine_ms = processor.metrics.combine_times[-1] * 1e3
+        log.info(
+            "%6d | dx=%+.3f +/- %.3f | dy=%+.3f +/- %.3f | "
+            "scatter %.3f,%.3f | %d/%d | combine %.3f ms",
+            combined.stamp_index,
+            combined.combined_dx,
+            combined.error_dx,
+            combined.combined_dy,
+            combined.error_dy,
+            combined.scatter_dx,
+            combined.scatter_dy,
+            combined.n_valid,
+            combined.n_total,
+            combine_ms,
+        )
+
+    return log_combined_offset
 
 
-def print_visit_start(sequence: int | None, label: str) -> None:
-    """Print a banner at the first stamp of each visit.
+def log_visit_start(sequence: int | None, label: str) -> None:
+    """Log a banner at the first stamp of each visit.
 
-    Registered as ``StreamingGuiderProcessor.on_visit_start``, so it
-    fires once per pointing before that visit's live per-frame trace,
-    making it unambiguous which sequence/image the following rows
-    belong to.
+    Registered as ``StreamingGuiderProcessor.on_visit_start`` when
+    ``--per-frame`` is set, so it fires once per pointing before that
+    visit's live per-frame trace, making it unambiguous which
+    sequence/image the following rows belong to.
     """
-    print(f"\n>>> visit start: sequence {sequence} " f"image '{label or '?'}' <<<")
+    log.info("visit start: sequence %s image '%s'", sequence, label or "?")
 
 
-def print_visit_summary(sequence: int | None, offsets: list[CombinedOffset]) -> None:
-    """Print a per-visit summary when a pointing ends.
+def log_visit_summary(sequence: int | None, offsets: list[CombinedOffset]) -> None:
+    """Log a per-visit summary when a pointing ends.
 
     Registered as ``StreamingGuiderProcessor.on_visit_complete``, so it
     fires at each sequence boundary (telescope slew) and once more for
@@ -110,19 +129,24 @@ def print_visit_summary(sequence: int | None, offsets: list[CombinedOffset]) -> 
     """
     valid = [offset for offset in offsets if offset.n_valid > 0]
     if not valid:
-        print(f"\n=== visit (sequence {sequence}) complete: no valid offsets ===")
+        log.info("visit (sequence %s) complete: no valid offsets", sequence)
         return
     dx = np.array([offset.combined_dx for offset in valid])
     dy = np.array([offset.combined_dy for offset in valid])
     error_dx = np.array([offset.error_dx for offset in valid])
     error_dy = np.array([offset.error_dy for offset in valid])
-    print(
-        f"\n=== visit (sequence {sequence}) complete ===\n"
-        f"acquisitions   : {len(valid)}/{len(offsets)} with >=1 valid sensor\n"
-        f"overall dx     : {np.median(dx):+.3f} "
-        f"+/- {np.nanmedian(error_dx):.3f} px\n"
-        f"overall dy     : {np.median(dy):+.3f} "
-        f"+/- {np.nanmedian(error_dy):.3f} px"
+    log.info(
+        "visit (sequence %s) complete\n"
+        "acquisitions : %d/%d with >=1 valid sensor\n"
+        "overall dx   : %+.3f +/- %.3f px\n"
+        "overall dy   : %+.3f +/- %.3f px",
+        sequence,
+        len(valid),
+        len(offsets),
+        np.median(dx),
+        np.nanmedian(error_dx),
+        np.median(dy),
+        np.nanmedian(error_dy),
     )
 
 
@@ -206,7 +230,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--per-frame",
         action="store_true",
-        help="Print the combined offset for every acquisition (frame) "
+        help="Log the combined offset for every acquisition (frame) "
         "live, as the stream runs, not just the final run summary.",
     )
     parser.add_argument(
@@ -226,17 +250,19 @@ def main(argv: list[str] | None = None) -> int:
         level = logging.WARNING
     else:
         level = logging.INFO
-    logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     config = GuiderTrackerConfig(seed_frames=args.seed_frames, min_snr=args.min_snr)
     processor = StreamingGuiderProcessor(
         config,
         progress_interval=args.progress,
-        on_combined_offset=print_combined_offset if args.per_frame else None,
-        on_visit_start=print_visit_start if args.per_frame else None,
-        on_visit_complete=print_visit_summary,
+        on_visit_start=log_visit_start if args.per_frame else None,
+        on_visit_complete=log_visit_summary,
     )
     if args.per_frame:
-        print("   idx |        dx +/- err |        dy +/- err | scatter | sensors")
+        processor.on_combined_offset = make_combined_offset_logger(processor)
 
     run_live(processor, args.partition, args.max_stamps, args.timeout)
 
