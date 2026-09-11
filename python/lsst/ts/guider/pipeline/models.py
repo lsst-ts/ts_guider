@@ -39,7 +39,7 @@ import numpy as np
 class GuiderTrackerConfig:
     """Algorithm and quality-cut configuration."""
 
-    seed_frames: int = 30
+    seed_frames: int = 10
     cutout_size: int = 50
     aperture_radius: float = 10.0
     gain: float = 1.0
@@ -103,3 +103,4 @@ class CombinedOffset:
     error_dx: float = float("nan")
     error_dy: float = float("nan")
     per_sensor_offset: dict[str, tuple[float, float]] = field(default_factory=dict)
+    measurements: dict[str, CentroidMeasurement] = field(default_factory=dict)

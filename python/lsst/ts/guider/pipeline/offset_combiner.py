@@ -100,6 +100,7 @@ class OffsetCombiner:
                 n_total=n_total,
                 scatter_dx=float("nan"),
                 scatter_dy=float("nan"),
+                measurements=dict(measurements),
             )
 
         offsets = np.array(list(per_sensor_offset.values()))
@@ -125,6 +126,7 @@ class OffsetCombiner:
             error_dx=float(error[0]),
             error_dy=float(error[1]),
             per_sensor_offset=per_sensor_offset,
+            measurements=dict(measurements),
         )
 
     def _to_camera_frame(

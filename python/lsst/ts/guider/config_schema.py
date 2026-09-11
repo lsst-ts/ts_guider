@@ -29,6 +29,23 @@ $id: https://github.com/lsst-ts/ts_guider/blob/main/python/lsst/ts/guider/config
 title: Guider v1
 description: Schema for Guider configuration files
 type: object
-properties: {}
+properties:
+  partition:
+    description: DAQ/GDS partition to subscribe to for guider stamps.
+    type: string
+  seed_frames:
+    description: >-
+      Number of stamps buffered per sensor before locking a guide star.
+      Optional; defaults to the pipeline value when omitted.
+    type: integer
+    minimum: 1
+  min_snr:
+    description: >-
+      Minimum HSM signal-to-noise ratio for a stamp measurement to
+      pass the quality cuts. Optional; defaults to the pipeline value
+      when omitted.
+    type: number
+required:
+  - partition
 additionalProperties: false
 """)
