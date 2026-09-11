@@ -112,11 +112,19 @@ PYBIND11_MODULE(guiderGDS, m)
         .def_readonly("stamp_index",  &::guider::StampMetadata::stamp_index)
         .def_readonly("sensor_name",  &::guider::StampMetadata::sensor_name)
         .def_readonly("segment",      &::guider::StampMetadata::segment)
+        .def_readonly("startrow",     &::guider::StampMetadata::startrow)
+        .def_readonly("startcol",     &::guider::StampMetadata::startcol)
+        .def_readonly("obs_id",       &::guider::StampMetadata::obs_id)
+        .def_readonly("series_id",    &::guider::StampMetadata::series_id)
         .def("__repr__", [](const ::guider::StampMetadata& md)
         {
             return "<StampMetadata sensor=" + std::to_string(md.sensor_index)
                  + " name=" + md.sensor_name
                  + " segment=" + std::to_string(md.segment)
+                 + " startrow=" + std::to_string(md.startrow)
+                 + " startcol=" + std::to_string(md.startcol)
+                 + " obs_id=" + md.obs_id
+                 + " series_id=" + md.series_id
                  + " seq=" + std::to_string(md.sequence)
                  + " stamp=" + std::to_string(md.stamp_index)
                  + " ts=" + std::to_string(md.timestamp_ns) + ">";
@@ -183,7 +191,11 @@ PYBIND11_MODULE(guiderGDS, m)
              std::uint32_t stamp_index,
              std::uint64_t timestamp_ns,
              std::string   sensor_name,
-             std::uint16_t segment)
+             std::uint16_t segment,
+             std::uint16_t startrow,
+             std::uint16_t startcol,
+             std::string   obs_id,
+             std::string   series_id)
           {
               ::guider::Stamp stamp;
               stamp.pixels = pixels.data();
@@ -195,6 +207,10 @@ PYBIND11_MODULE(guiderGDS, m)
               stamp.metadata.stamp_index  = stamp_index;
               stamp.metadata.sensor_name  = std::move(sensor_name);
               stamp.metadata.segment      = segment;
+              stamp.metadata.startrow     = startrow;
+              stamp.metadata.startcol     = startcol;
+              stamp.metadata.obs_id       = std::move(obs_id);
+              stamp.metadata.series_id    = std::move(series_id);
 
               auto callback = make_python_callback(std::move(on_stamp));
               callback(stamp);
@@ -207,6 +223,10 @@ PYBIND11_MODULE(guiderGDS, m)
           py::arg("timestamp_ns") = 0,
           py::arg("sensor_name")  = std::string(),
           py::arg("segment")      = 0,
+          py::arg("startrow")     = 0,
+          py::arg("startcol")     = 0,
+          py::arg("obs_id")       = std::string(),
+          py::arg("series_id")    = std::string(),
           "Test-only: run a synthetic 2D int32 stamp through the "
           "stamp-callback path. Not part of the public API.");
 }
