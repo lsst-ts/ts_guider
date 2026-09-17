@@ -19,9 +19,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import setuptools
-import setuptools_scm
+import math
 
-setuptools.setup(
-    version=setuptools_scm.get_version(write_to="python/lsst/ts/guider/version.py")
-)
+from lsst.ts.guider.pipeline import CentroidMeasurement
+
+
+def test_signed_local_offset_retains_quality_information():
+    measurement = CentroidMeasurement(
+        x=102.25, y=79.5, converged=True, passed_quality=False
+    )
+    assert measurement.offset_from((100, 80)) == (2.25, -0.5)
+    assert measurement.is_finite
+    assert not measurement.passed_quality
+
+
+def test_failed_measurement_has_no_usable_offset():
+    measurement = CentroidMeasurement()
+    assert not measurement.converged
+    assert not measurement.passed_quality
+    assert not measurement.is_finite
+    assert all(math.isnan(value) for value in measurement.offset_from((100, 80)))

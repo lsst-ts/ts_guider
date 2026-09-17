@@ -19,9 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import setuptools
-import setuptools_scm
+import dataclasses
 
-setuptools.setup(
-    version=setuptools_scm.get_version(write_to="python/lsst/ts/guider/version.py")
-)
+import pytest
+from lsst.ts.guider.pipeline import GuiderTrackerConfig
+
+
+def test_configuration_is_immutable():
+    config = GuiderTrackerConfig()
+    assert config.seed_frames == 10
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        config.seed_frames = 5

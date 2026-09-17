@@ -1,0 +1,2 @@
+Add single-sensor reference-star selection, adaptive-moment centroiding,
+quality checks, and local pixel offsets.

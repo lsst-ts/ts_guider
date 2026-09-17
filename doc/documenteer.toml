@@ -1,0 +1,9 @@
+[project]
+title = "ts_guider"
+copyright = "2021 Association of Universities for Research in Astronomy, Inc. (AURA)"
+github_url = "https://github.com/lsst-ts/ts_guider"
+
+[project.python]
+package = "ts_guider"
+documentation_url_key = "documentation"
+github_url_key = "repository"
