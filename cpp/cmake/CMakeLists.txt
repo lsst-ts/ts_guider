@@ -10,8 +10,9 @@ project(guider_gds CXX)
 #   BUILD_MODULE (default ON)  — build the guiderGDS pybind module.
 #                                Requires the daq-sdk (CCSDAQ).
 #   BUILD_TESTS  (default OFF) — build the GoogleTest unit tests under
-#                                tests/. These cover SDK-free code
-#                                (stamp_source.hh) and need NO daq-sdk.
+#                                tests/. The stamp_source.hh tests need
+#                                NO daq-sdk. With BUILD_MODULE=ON, also
+#                                build the SDK decoder metadata test.
 #
 # This split lets CI run the C++ unit tests before the daq-sdk is
 # available in the dev image:

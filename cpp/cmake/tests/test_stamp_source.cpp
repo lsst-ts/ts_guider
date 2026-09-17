@@ -1,3 +1,26 @@
+/*
+ * This file is part of ts_guider.
+ *
+ * Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+ * This product includes software developed by the LSST Project
+ * (https://www.lsst.org).
+ * See the COPYRIGHT file at the top-level directory of this distribution
+ * for details of code ownership.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
 // Proof-of-life GoogleTest for the guider stamp DTOs.
 //
 // The structs in stamp_source.hh are intentionally tiny; this test
@@ -24,6 +47,11 @@ TEST(StampSource, StampMetadataDefaultsToZero)
     EXPECT_EQ(md.sensor_index, 0u);
     EXPECT_EQ(md.sequence, 0u);
     EXPECT_EQ(md.stamp_index, 0u);
+    EXPECT_EQ(md.segment, 0u);
+    EXPECT_EQ(md.startrow, 0u);
+    EXPECT_EQ(md.startcol, 0u);
+    EXPECT_TRUE(md.obs_id.empty());
+    EXPECT_TRUE(md.series_id.empty());
 }
 
 TEST(StampSource, StampDefaultConstructsEmpty)
@@ -56,6 +84,11 @@ TEST(StampSource, StampCallbackRoundTripsAStampValue)
     sent.metadata.sensor_index = 3;
     sent.metadata.sequence     = 1;
     sent.metadata.stamp_index  = 7;
+    sent.metadata.segment      = 5;
+    sent.metadata.startrow     = 123;
+    sent.metadata.startcol     = 456;
+    sent.metadata.obs_id       = "image";
+    sent.metadata.series_id    = "roi";
 
     cb(sent);
 
@@ -65,6 +98,11 @@ TEST(StampSource, StampCallbackRoundTripsAStampValue)
     EXPECT_EQ(captured.metadata.sensor_index, 3u);
     EXPECT_EQ(captured.metadata.sequence, 1u);
     EXPECT_EQ(captured.metadata.stamp_index, 7u);
+    EXPECT_EQ(captured.metadata.segment, 5u);
+    EXPECT_EQ(captured.metadata.startrow, 123u);
+    EXPECT_EQ(captured.metadata.startcol, 456u);
+    EXPECT_EQ(captured.metadata.obs_id, "image");
+    EXPECT_EQ(captured.metadata.series_id, "roi");
 }
 
 TEST(StampSource, RowMajorPixelIndexing)

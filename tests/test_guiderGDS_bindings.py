@@ -1,6 +1,6 @@
 # This file is part of ts_guider.
 #
-# Developed for Vera C. Rubin Observatory Telescope and Site Systems.
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -13,29 +13,11 @@
 #
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-"""Unit tests for the guiderGDS pybind bindings.
-
-These exercise the C++/Python boundary in pybind_GDS.cpp without a
-live DAQ or emulator, using the test-only _invoke_callback_for_test
-seam to run a synthetic stamp through the real callback path.
-
-The guiderGDS extension module is only available once cpp/cmake has
-been built (which requires the daq-sdk). When it is not importable
-(e.g. CI before the SDK is in the image) the whole module is skipped
-rather than failed. To run locally, build the module and put it on
-PYTHONPATH, e.g.::
-
-    cd cpp/cmake
-    cmake -S . -B build -DBUILD_TESTS=ON
-    cmake --build build
-    PYTHONPATH=build pytest ../../tests/test_guiderGDS_bindings.py
-"""
 
 import numpy as np
 import pytest
@@ -44,6 +26,7 @@ guiderGDS = pytest.importorskip("guiderGDS")
 
 
 def test_callback_receives_int32_array_and_metadata():
+    """Pass a synthetic stamp through the real C++ callback boundary."""
     sent = np.arange(12, dtype=np.int32).reshape(3, 4)
     received = {}
 
@@ -55,6 +38,15 @@ def test_callback_receives_int32_array_and_metadata():
         received["sequence"] = metadata.sequence
         received["stamp_index"] = metadata.stamp_index
         received["timestamp_ns"] = metadata.timestamp_ns
+        for name in (
+            "sensor_name",
+            "segment",
+            "startrow",
+            "startcol",
+            "obs_id",
+            "series_id",
+        ):
+            received[name] = getattr(metadata, name)
 
     guiderGDS._invoke_callback_for_test(
         on_stamp,
@@ -63,6 +55,12 @@ def test_callback_receives_int32_array_and_metadata():
         sequence=1,
         stamp_index=7,
         timestamp_ns=1779413890189701790,
+        sensor_name="00/1/0",
+        segment=5,
+        startrow=123,
+        startcol=456,
+        obs_id="MC_O_20260702_000024",
+        series_id="roi-configuration",
     )
 
     assert received["shape"] == (3, 4)
@@ -72,6 +70,11 @@ def test_callback_receives_int32_array_and_metadata():
     assert received["sequence"] == 1
     assert received["stamp_index"] == 7
     assert received["timestamp_ns"] == 1779413890189701790
+    assert received["sensor_name"] == "00/1/0"
+    assert received["segment"] == 5
+    assert (received["startrow"], received["startcol"]) == (123, 456)
+    assert received["obs_id"] == "MC_O_20260702_000024"
+    assert received["series_id"] == "roi-configuration"
 
 
 def test_callback_receives_independent_copy():
