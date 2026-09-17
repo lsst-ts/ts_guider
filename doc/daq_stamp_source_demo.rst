@@ -9,6 +9,7 @@ stamps or a timeout.
 The defaults preserve the original demo: partition ``gds-emu``, 400 stamps,
 and a 100-second timeout.
 This exercises the DAQ Python bindings; it does not calculate guider offsets.
+For the complete tracking algorithm, use :ref:`daq-guider-pipeline-demo`.
 The printed metadata also includes the ROI origin, image name, and series ID.
 
 Activate the standard LSST environment, including salobj and ts_xml, and

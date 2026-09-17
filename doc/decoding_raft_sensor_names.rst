@@ -90,7 +90,8 @@ than a flat range 0--15. The FITS equivalent is ``ROISEG=Segment05``.
 All sensors with the same series sequence and acquisition index contribute
 to one combined offset. The index alone is insufficient across series.
 See :ref:`streaming-guider-pipeline` for rollover, missing-data, and
-reference-reset rules.
+reference-reset rules, and :ref:`daq-guider-pipeline-demo` for multi-sensor
+emulation.
 
 API reference
 ----------------------------------------

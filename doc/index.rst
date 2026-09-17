@@ -20,7 +20,9 @@ Using lsst.ts.guider
    offset_combination
    streaming_guider_pipeline
    decoding_raft_sensor_names
+   installation
    daq_stamp_source_demo
+   daq_guider_pipeline_demo
 
 .. _lsst.ts.guider-contributing:
 

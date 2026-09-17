@@ -20,6 +20,7 @@ where = ["python"]
 [project.scripts]
 run_guider_csc = "lsst.ts.guider:run_guider_csc"
 run_daq_stamp_source_demo = "lsst.ts.guider.demo:run_daq_stamp_source_demo"
+run_daq_guider_pipeline_demo = "lsst.ts.guider.demo:run_daq_guider_pipeline_demo"
 
 [tool.setuptools_scm]
 

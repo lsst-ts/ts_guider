@@ -148,10 +148,15 @@ Metrics and reporting
 
 Combination timing measures only the combiner call. Callback timing
 includes work from callback entry to exit; it is not latency from the
-DAQ acquisition timestamp.
+DAQ acquisition timestamp. The ``--per-frame`` demo labels the printed
+value as ``combine`` time.
 Timing samples and combined results are retained for the processor's
 lifetime, so memory grows with the run. Recreate the processor between
 bounded runs if retaining the complete history is unnecessary.
+
+Console formatting lives in ``demo/streaming_report.py`` and the demo's
+logging callbacks. The processor exposes results and metrics independently
+of that presentation.
 
 Validation and extraction notes
 ----------------------------------------
@@ -160,6 +165,8 @@ The streaming tests cover seed replay, failed locks, short series,
 missing stamps, staggered locking, sequence and
 stamp rollover, repeated finalization, metadata refresh, and agreement
 with the offline algorithm using real centroiding and camera geometry.
+The :ref:`DAQ demo guide <daq-guider-pipeline-demo>` describes the emulator
+test through the actual C++ decoder and worker callback.
 
 The implementation comes from OSW-2858's ``pipeline/streaming.py``.
 ``StreamingGuiderProcessor`` and ``StreamingMetrics`` have matching module
