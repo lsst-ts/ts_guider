@@ -38,6 +38,15 @@ def test_callback_receives_int32_array_and_metadata():
         received["sequence"] = metadata.sequence
         received["stamp_index"] = metadata.stamp_index
         received["timestamp_ns"] = metadata.timestamp_ns
+        for name in (
+            "sensor_name",
+            "segment",
+            "startrow",
+            "startcol",
+            "obs_id",
+            "series_id",
+        ):
+            received[name] = getattr(metadata, name)
 
     guiderGDS._invoke_callback_for_test(
         on_stamp,
@@ -46,6 +55,12 @@ def test_callback_receives_int32_array_and_metadata():
         sequence=1,
         stamp_index=7,
         timestamp_ns=1779413890189701790,
+        sensor_name="00/1/0",
+        segment=5,
+        startrow=123,
+        startcol=456,
+        obs_id="MC_O_20260702_000024",
+        series_id="roi-configuration",
     )
 
     assert received["shape"] == (3, 4)
@@ -55,6 +70,11 @@ def test_callback_receives_int32_array_and_metadata():
     assert received["sequence"] == 1
     assert received["stamp_index"] == 7
     assert received["timestamp_ns"] == 1779413890189701790
+    assert received["sensor_name"] == "00/1/0"
+    assert received["segment"] == 5
+    assert (received["startrow"], received["startcol"]) == (123, 456)
+    assert received["obs_id"] == "MC_O_20260702_000024"
+    assert received["series_id"] == "roi-configuration"
 
 
 def test_callback_receives_independent_copy():

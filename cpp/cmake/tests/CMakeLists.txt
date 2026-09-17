@@ -3,6 +3,8 @@
 # GoogleTest (and gmock) ship in the LSST conda stack used by the
 # lsstts/develop-env image, so find_package(GTest) needs no download.
 # CI consumes JUnit XML emitted by ctest --output-junit.
+# test_decoder additionally requires the SDK and a running partition;
+# the optional Python emulator test supplies that partition.
 
 find_package(GTest REQUIRED)
 include(GoogleTest)
@@ -13,9 +15,20 @@ file(GLOB TEST_SOURCES CONFIGURE_DEPENDS "test_*.cpp")
 
 foreach(test_source ${TEST_SOURCES})
     get_filename_component(test_name "${test_source}" NAME_WE)
+    if(test_name STREQUAL "test_decoder" AND NOT BUILD_MODULE)
+        continue()
+    endif()
     add_executable(${test_name} "${test_source}")
     target_include_directories(${test_name}
         PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
     target_link_libraries(${test_name} PRIVATE GTest::gtest_main)
+    if(test_name STREQUAL "test_decoder")
+        target_sources(${test_name} PRIVATE ../src/Decoder.cc)
+        target_include_directories(${test_name} PRIVATE ${CCSDAQ_DIR}/include)
+        target_link_directories(${test_name} PRIVATE ${CCSDAQ_DIR}/x86/lib)
+        target_link_libraries(${test_name} PRIVATE
+            daq_gds daq_dsi daq_dsm daq_dsid daq_daq daq_dvi
+            daq_net daq_osa daq_rms daq_reb daq_scs daq_hash)
+    endif()
     gtest_discover_tests(${test_name})
 endforeach()

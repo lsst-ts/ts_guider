@@ -55,7 +55,13 @@ def test_import_and_help_without_daq(monkeypatch, capsys):
 def test_receive_requested_stamps(daq_source, capsys):
     binding, source, locations = daq_source
     metadata = SimpleNamespace(
-        sensor_index=3, sensor_name="R00_SG0", segment="Segment10"
+        sensor_index=3,
+        sensor_name="R00_SG0",
+        segment=10,
+        startrow=20,
+        startcol=30,
+        obs_id="image",
+        series_id="roi",
     )
 
     def deliver(callback):
@@ -73,6 +79,7 @@ def test_receive_requested_stamps(daq_source, capsys):
     output = capsys.readouterr().out
     assert output.count("pixels.shape: (2, 3)") == 2
     assert "sensor_name: R00_SG0" in output
+    assert "startrow: 20, startcol: 30, obs_id: image, series_id: roi" in output
     assert "received 2 stamps in Python" in output
     assert "timeout" not in output
 

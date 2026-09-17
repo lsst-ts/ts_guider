@@ -9,6 +9,7 @@
 #include "gds/Set.hh"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace GDS { namespace Guider {
@@ -31,7 +32,8 @@ public:
             const GDS::LocationSet&  locations,
             ::guider::StampCallback  on_stamp);
 
-private:
+protected:
+    // Permit a test subclass to drive the actual SDK callbacks directly.
     void start    (const GDS::StateMetadata& state, const GDS::SeriesMetadata& series);
     void resume   (const GDS::StateMetadata& state);
     void pause    (const GDS::StateMetadata& state);
@@ -56,8 +58,17 @@ private:
     unsigned       _stamps [GDS::Set::SIZE];
     unsigned       _rstamps[GDS::Set::SIZE];
 
-    // Per-sensor ROI segment. 
-    std::uint16_t  _segment[GDS::Set::SIZE];
+    // Per-sensor ROI segment and window origin, cached in start().
+    std::uint16_t  _segment [GDS::Set::SIZE];
+    std::uint16_t  _startrow[GDS::Set::SIZE];
+    std::uint16_t  _startcol[GDS::Set::SIZE];
+
+    // Per-sensor image name (OBSID), cached from the resume() comment.
+    std::string    _obs_id[GDS::Set::SIZE];
+
+    // Per-sensor series (ROI/config) id from SeriesMetadata::id(), cached
+    // in start(). Distinct from the image name; kept for diagnostics.
+    std::string    _series_id[GDS::Set::SIZE];
 
     // Decode buffer handed to the SDK in allocate(). Sized once per
     // series; reused across stamps.

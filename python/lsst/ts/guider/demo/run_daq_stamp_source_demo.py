@@ -86,6 +86,10 @@ def run_daq_stamp_source_demo(args: list[str] | None = None) -> None:
             f"sensor_index: {metadata.sensor_index}, "
             f"sensor_name: {metadata.sensor_name}, "
             f"segment: {metadata.segment}, "
+            f"startrow: {metadata.startrow}, "
+            f"startcol: {metadata.startcol}, "
+            f"obs_id: {metadata.obs_id}, "
+            f"series_id: {metadata.series_id}, "
             f"metadata: {metadata}"
         )
         received.append(metadata)
