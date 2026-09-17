@@ -1,0 +1,6 @@
+Add live multi-sensor DAQ processing with seed buffering, acquisition
+grouping, series resets, and idempotent finalization.
+Carry ROI and image/series metadata through the C++ decoder and Python
+bindings, and handle counter rollover and staggered seed replay.
+Package the DAQ pipeline demo as a console command with metrics, emulator
+validation, and setup documentation.
