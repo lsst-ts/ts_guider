@@ -19,9 +19,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-from .centroid_measurement import *
-from .combined_offset import *
-from .guider_sequence import *
-from .guider_tracker_config import *
-from .offset_combiner import *
-from .sensor_tracker import *
+from __future__ import annotations
+
+__all__ = ["GuiderSequence"]
+
+from dataclasses import dataclass
+
+import numpy as np
+
+
+@dataclass
+class GuiderSequence:
+    """All stamps of one guide sequence for a single sensor.
+
+    ``stamps`` has shape ``(frames, rows, columns)``. ``timestamps_mjd``
+    contains each stamp's ``STMPTMJD`` header value, or NaN if absent.
+    ``segment`` is the FITS ``ROISEG`` value, such as ``"Segment05"``.
+    """
+
+    stamps: np.ndarray
+    timestamps_mjd: np.ndarray
+    sensor_name: str
+    segment: str | None = None
+
+    @property
+    def n_stamps(self) -> int:
+        return self.stamps.shape[0]
