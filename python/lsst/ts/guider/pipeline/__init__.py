@@ -19,9 +19,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import setuptools
-import setuptools_scm
-
-setuptools.setup(
-    version=setuptools_scm.get_version(write_to="python/lsst/ts/guider/version.py")
-)
+from .centroid_measurement import *
+from .combined_offset import *
+from .detection import *
+from .fits_io import *
+from .guider_sequence import *
+from .guider_tracker_config import *
+from .multi_sensor_runner import *
+from .offset_combiner import *
+from .sensor_tracker import *

@@ -19,9 +19,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import setuptools
-import setuptools_scm
+from __future__ import annotations
 
-setuptools.setup(
-    version=setuptools_scm.get_version(write_to="python/lsst/ts/guider/version.py")
-)
+__all__ = ["GuiderSequence"]
+
+from dataclasses import dataclass
+
+import numpy as np
+
+
+@dataclass
+class GuiderSequence:
+    """All stamps of one guide sequence for a single sensor.
+
+    ``stamps`` has shape ``(frames, rows, columns)``. ``timestamps_mjd``
+    contains each stamp's ``STMPTMJD`` header value, or NaN if absent.
+    ``segment`` is the FITS ``ROISEG`` value, such as ``"Segment05"``.
+    """
+
+    stamps: np.ndarray
+    timestamps_mjd: np.ndarray
+    sensor_name: str
+    segment: str | None = None
+
+    @property
+    def n_stamps(self) -> int:
+        return self.stamps.shape[0]

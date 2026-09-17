@@ -1,0 +1,3 @@
+Add camera-model orientation transforms and multi-sensor offset combination,
+including sample scatter, standard errors, and retained sensor measurements.
+Provide an offline runner for FITS stamp sequences.
