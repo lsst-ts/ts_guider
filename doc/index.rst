@@ -18,6 +18,7 @@ Using lsst.ts.guider
 
    sensor_tracking
    offset_combination
+   streaming_guider_pipeline
    decoding_raft_sensor_names
    daq_stamp_source_demo
 

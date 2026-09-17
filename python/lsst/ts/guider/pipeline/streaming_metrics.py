@@ -19,14 +19,31 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-from .centroid_measurement import *
-from .combined_offset import *
-from .detection import *
-from .fits_io import *
-from .guider_sequence import *
-from .guider_tracker_config import *
-from .multi_sensor_runner import *
-from .offset_combiner import *
-from .sensor_tracker import *
-from .streaming_guider_processor import *
-from .streaming_metrics import *
+from __future__ import annotations
+
+__all__ = ["StreamingMetrics"]
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class StreamingMetrics:
+    """Timing and counts accumulated while the stream is running."""
+
+    total_stamps: int = 0
+    seed_stamps: int = 0
+    valid_measurements: int = 0
+    invalid_measurements: int = 0
+    measure_times: list[float] = field(default_factory=list)
+    lock_times: list[float] = field(default_factory=list)
+    callback_times: list[float] = field(default_factory=list)
+    combine_times: list[float] = field(default_factory=list)
+    first_stamp_time: float | None = None
+    last_stamp_time: float | None = None
+    discarded_seed_measurements: int = 0
+
+    @property
+    def stream_seconds(self) -> float:
+        if self.first_stamp_time is None or self.last_stamp_time is None:
+            return 0.0
+        return self.last_stamp_time - self.first_stamp_time
