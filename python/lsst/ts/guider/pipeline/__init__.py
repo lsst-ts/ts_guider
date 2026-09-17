@@ -19,17 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# Sphinx configuration for single-package documentation builds.
-
-import lsst.ts.guider  # noqa
-from documenteer.conf.guide import *  # noqa
-
-project = "ts_guider"
-html_title = project
-html_short_title = project
-
-# Release-note fragments are assembled separately.
-exclude_patterns += ["news/*"]  # type: ignore # noqa
-
-intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # type: ignore # noqa
-intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # type: ignore # noqa
+from .centroid_measurement import *
+from .guider_tracker_config import *
+from .sensor_tracker import *

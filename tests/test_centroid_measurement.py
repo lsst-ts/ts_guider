@@ -19,17 +19,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# Sphinx configuration for single-package documentation builds.
+import math
 
-import lsst.ts.guider  # noqa
-from documenteer.conf.guide import *  # noqa
+from lsst.ts.guider.pipeline import CentroidMeasurement
 
-project = "ts_guider"
-html_title = project
-html_short_title = project
 
-# Release-note fragments are assembled separately.
-exclude_patterns += ["news/*"]  # type: ignore # noqa
+def test_signed_local_offset_retains_quality_information():
+    measurement = CentroidMeasurement(
+        x=102.25, y=79.5, converged=True, passed_quality=False
+    )
+    assert measurement.offset_from((100, 80)) == (2.25, -0.5)
+    assert measurement.is_finite
+    assert not measurement.passed_quality
 
-intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # type: ignore # noqa
-intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # type: ignore # noqa
+
+def test_failed_measurement_has_no_usable_offset():
+    measurement = CentroidMeasurement()
+    assert not measurement.converged
+    assert not measurement.passed_quality
+    assert not measurement.is_finite
+    assert all(math.isnan(value) for value in measurement.offset_from((100, 80)))
