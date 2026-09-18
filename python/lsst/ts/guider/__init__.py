@@ -25,4 +25,15 @@ except ImportError:
     __version__ = "?"
 
 from .config_schema import *
-from .guider_csc import *
+
+
+def __getattr__(name):
+    # Expose the salobj-based CSC lazily so that importing the tracking
+    # algorithm (``lsst.ts.guider.pipeline`` / ``sensor_orientation``)
+    # does not require salobj. ``guider.GuiderCsc`` and the
+    # ``run_guider_csc`` entry point keep working via this hook.
+    if name in ("GuiderCsc", "run_guider_csc"):
+        from . import guider_csc
+
+        return getattr(guider_csc, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -1,0 +1,7 @@
+# Guider CSC configuration for manual end-to-end runs against the
+# GDS emulator (dsid_standalone / gds_emulator on partition gds-emu).
+partition: gds-emu
+# Shorter warm-up than the production default (30) so combined
+# offsets appear sooner in short emulator runs.
+seed_frames: 10
+min_snr: 10.0

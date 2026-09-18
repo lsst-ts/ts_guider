@@ -31,6 +31,25 @@ struct StampMetadata
 
     // ROI segment (amplifier) for this sensor's series.
     std::uint16_t segment = 0;
+
+    // ROI window origin on the CCD for this sensor's series (FITS ROIROW /
+    // ROICOL). Together with segment these identify the ROI region; a change
+    // means the window moved to a different star, so downstream code treats
+    // (segment, startrow, startcol) as the per-sensor coadd key.
+    std::uint16_t startrow = 0;
+    std::uint16_t startcol = 0;
+
+    // Image name (OBSID, e.g. "MC_O_20260604_000280") from the resume
+    // command's comment (per Gregg, 2026-07-06), constant across a resume's
+    // stamps. A new image issues a new resume, so this is the coadd/visit
+    // key downstream code triggers a new combine on when it changes. Empty
+    // until the first resume of a series arrives.
+    std::string obs_id;
+
+    // Series (ROI/config) identity from GDS::SeriesMetadata::id(), set at
+    // start()/initGuider. Not the image name (one ROI can host several
+    // images); kept for diagnostics and to disambiguate ROI changes.
+    std::string series_id;
 };
 
 struct Stamp
