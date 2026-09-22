@@ -6,17 +6,7 @@
 lsst.ts.guider
 ##############
 
-.. Paragraph that describes what this Python module does and links to related modules and frameworks.
-
-.. .. _lsst.ts.guider-using:
-
-.. Using lsst.ts.guider
-.. ====================
-
-.. toctree linking to topics related to using the module's APIs.
-
-.. .. toctree::
-..    :maxdepth: 1
+The Guider package provides the guider CSC.
 
 .. _lsst.ts.guider-contributing:
 
