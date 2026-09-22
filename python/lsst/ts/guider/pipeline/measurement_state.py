@@ -19,7 +19,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-from .centroid_measurement import *
-from .detection import *
-from .guider_tracker_config import *
-from .measurement_state import *
+__all__ = ["MeasurementState"]
+
+import enum
+
+
+class MeasurementState(enum.IntEnum):
+    """Fit convergence and quality for one centroid measurement.
+
+    This state describes an individual result, independently of the
+    sensor's tracking state. A coordinate-only reference remains NOT_SET.
+    """
+
+    # No measurement outcome is available.
+    NOT_SET = 0
+    # The cutout was unusable or the adaptive-moment fit did not converge.
+    NOT_CONVERGED = enum.auto()
+    # The fit converged but the result did not pass the quality cuts.
+    CONVERGED = enum.auto()
+    # The fit converged and the result passed all quality cuts.
+    PASSED_QUALITY = enum.auto()
