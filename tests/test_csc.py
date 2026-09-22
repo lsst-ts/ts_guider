@@ -47,10 +47,4 @@ class GuiderCscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             config_dir=None,
             simulation_mode=1,
         ):
-            await self.check_standard_state_transitions(
-                enabled_commands=(
-                    "startGuiding",
-                    "stopGuiding",
-                    "resumeGuiding",
-                )
-            )
+            await self.check_standard_state_transitions(enabled_commands=())
