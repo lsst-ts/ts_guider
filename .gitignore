@@ -19,3 +19,7 @@ pytest_session.txt
 .cache/
 .pytest_cache
 .coverage
+.pre-commit-config.yaml
+.LICENSE.txt
+.flake8
+.isort.cfg
