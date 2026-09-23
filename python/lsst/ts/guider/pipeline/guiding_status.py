@@ -19,9 +19,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-from .centroid_measurement import *
-from .detection import *
-from .guider_tracker_config import *
-from .guiding_status import *
-from .measurement_state import *
-from .sensor_tracker import *
+__all__ = ["GuidingStatus"]
+
+import enum
+
+
+class GuidingStatus(enum.IntEnum):
+    """Per-sensor tracking state, independent of DAQ series events.
+
+    Measurement quality is reported separately on each centroid result.
+    Automatic transitions to LOST are reserved for a future agreed loss
+    and recovery policy; the current tracker does not emit that state.
+    """
+
+    # No stamps have been processed since construction or reset.
+    NONE = enum.auto()
+    # Accumulating seeds and trying to select an acceptable target.
+    LOCKING = enum.auto()
+    # A target is selected; individual measurements may still be rejected.
+    LOCKED = enum.auto()
+    # Tracking has been lost but is recoverable; transition policy pending.
+    LOST = enum.auto()
+    # Processing failed; explicit reset or reference locking is required.
+    ERROR = enum.auto()
