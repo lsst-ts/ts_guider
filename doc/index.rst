@@ -6,7 +6,17 @@
 lsst.ts.guider
 ##############
 
-The Guider package provides the guider CSC.
+The Guider package provides the guider CSC and image-processing components.
+The tracking API selects a reference star and measures its displacement in
+individual sensor stamps.
+
+Using lsst.ts.guider
+========================================
+
+.. toctree::
+   :maxdepth: 1
+
+   sensor_tracking
 
 .. _lsst.ts.guider-contributing:
 
