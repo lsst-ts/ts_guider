@@ -20,6 +20,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from .centroid_measurement import *
+from .combined_offset import *
 from .detection import *
 from .fits_io import *
 from .guider_sequence import *
