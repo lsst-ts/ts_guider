@@ -21,6 +21,8 @@
 
 from .centroid_measurement import *
 from .detection import *
+from .fits_io import *
+from .guider_sequence import *
 from .guider_tracker_config import *
 from .guiding_status import *
 from .measurement_state import *
