@@ -27,5 +27,6 @@ from .guider_sequence import *
 from .guider_tracker_config import *
 from .guiding_status import *
 from .measurement_state import *
+from .multi_sensor_runner import *
 from .offset_combiner import *
 from .sensor_tracker import *
