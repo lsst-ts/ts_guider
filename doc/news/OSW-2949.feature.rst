@@ -1,0 +1,2 @@
+Added mutable GuiderTrackerConfig for reference selection, centroid measurement, and quality cuts.
+Supported configuration replacement when resetting a tracker.
