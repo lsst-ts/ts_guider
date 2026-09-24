@@ -18,10 +18,3 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-import setuptools
-import setuptools_scm
-
-setuptools.setup(
-    version=setuptools_scm.get_version(write_to="python/lsst/ts/guider/version.py")
-)

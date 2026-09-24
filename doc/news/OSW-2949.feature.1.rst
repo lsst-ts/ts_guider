@@ -1,0 +1,1 @@
+Added Detection to build seed reference images, find candidate sources, and estimate annulus backgrounds using shared configuration.

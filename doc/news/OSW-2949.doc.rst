@@ -1,0 +1,1 @@
+Documented single-sensor reference selection, per-stamp tracking, quality checks, configuration replacement, and a synthetic displacement example.

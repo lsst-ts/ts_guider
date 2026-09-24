@@ -7,6 +7,7 @@ name = "ts_guider"
 description = "CSC for the guider subsystem at the Vera C. Rubin Observatory."
 license = { text = "GPL" }
 classifiers = ["Programming Language :: Python :: 3"]
+dependencies = ["astropy", "galsim", "numpy", "PyYAML", "scipy"]
 urls = { documentation = "https://ts-guider.lsst.io", repository = "https://github.com/lsst-ts/ts_guider" }
 dynamic = ["version"]
 
@@ -18,6 +19,7 @@ where = ["python"]
 
 [project.scripts]
 run_guider_csc = "lsst.ts.guider:run_guider_csc"
+run_daq_stamp_source_demo = "lsst.ts.guider.demo.run_daq_stamp_source_demo:run_daq_stamp_source_demo"
 
 [tool.setuptools_scm]
 

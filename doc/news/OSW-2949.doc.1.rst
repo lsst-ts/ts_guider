@@ -1,0 +1,1 @@
+Documented building the DAQ bindings and running the stamp-source demo against the emulator.

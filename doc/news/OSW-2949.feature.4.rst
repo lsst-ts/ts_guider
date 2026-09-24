@@ -1,0 +1,1 @@
+Added the standalone DAQ stamp-source console command with configurable logging and contextual guidance when the C++ bindings are unavailable.

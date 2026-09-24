@@ -1,0 +1,3 @@
+Added SensorTracker for per-stamp reference acquisition, tracking status, and local pixel offsets.
+Retained seed stamps across failed locking attempts and replayed all accumulated seeds in input order after a successful lock.
+Kept measurement quality separate from tracking state; deferred automatic loss and recovery transitions.

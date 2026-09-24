@@ -1,0 +1,3 @@
+Removed obsolete guiding command handlers and ``guidingStatus`` publication
+from the CSC skeleton to match the current Guider XML interface.
+Updated the standard state-transition test to use only standard CSC commands.

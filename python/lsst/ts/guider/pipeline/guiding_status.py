@@ -19,9 +19,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import setuptools
-import setuptools_scm
+__all__ = ["GuidingStatus"]
 
-setuptools.setup(
-    version=setuptools_scm.get_version(write_to="python/lsst/ts/guider/version.py")
-)
+import enum
+
+
+class GuidingStatus(enum.IntEnum):
+    """Per-sensor tracking state, independent of DAQ series events.
+
+    Measurement quality is reported separately on each centroid result.
+    Automatic transitions to LOST are reserved for a future agreed loss
+    and recovery policy; the current tracker does not emit that state.
+    """
+
+    # No stamps have been processed since construction or reset.
+    NONE = enum.auto()
+    # Accumulating seeds and trying to select an acceptable target.
+    LOCKING = enum.auto()
+    # A target is selected; individual measurements may still be rejected.
+    LOCKED = enum.auto()
+    # Tracking has been lost but is recoverable; transition policy pending.
+    LOST = enum.auto()
+    # Processing failed; explicit reset or reference locking is required.
+    ERROR = enum.auto()

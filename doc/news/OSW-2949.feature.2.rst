@@ -1,0 +1,3 @@
+Added CentroidMeasurement to retain centroid, shape, and quality information.
+Represented fit convergence and quality with a single MeasurementState enumeration.
+Computed offsets between measurement objects with finite-coordinate checks.

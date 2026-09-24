@@ -6,17 +6,18 @@
 lsst.ts.guider
 ##############
 
-.. Paragraph that describes what this Python module does and links to related modules and frameworks.
+The Guider package provides the guider CSC and image-processing components.
+The tracking API selects a reference star and measures its displacement in
+individual sensor stamps.
 
-.. .. _lsst.ts.guider-using:
+Using lsst.ts.guider
+========================================
 
-.. Using lsst.ts.guider
-.. ====================
+.. toctree::
+   :maxdepth: 1
 
-.. toctree linking to topics related to using the module's APIs.
-
-.. .. toctree::
-..    :maxdepth: 1
+   sensor_tracking
+   daq_stamp_source_demo
 
 .. _lsst.ts.guider-contributing:
 
