@@ -33,6 +33,14 @@ git clone https://github.com/lsst-ts/ts_xml.git
 Keep the three checkouts on `develop` (or the ticket branches you are
 testing) and pull them before a session.
 
+This CSC requires the Guider interface from OSW-2943 in `ts_xml`
+(`066cda4d`, merged into develop as `853318b5`) or a compatible
+successor. The CSC and watcher must import the same XML definitions.
+The event fields use camel case, such as `deltaX`, `centroidDx`, and
+`roiCommonNrows`. The `offsets` telemetry contains `x`, `y`, and
+`rotation`; the contributing count is `summaryResults.goodStamps`.
+Combined uncertainties and scatter are retained in the CSC logs below.
+
 `ts_xml` and `ts_salobj` are not installed in the container. They are
 pure Python and read their data files relative to the package, so
 prepending `~/ts_repos/ts_xml/python` and `~/ts_repos/ts_salobj/python`
@@ -44,13 +52,11 @@ that `__version__` reads `"?"`, since `version.py` is generated at
 install time. `ts_guider` is the one package that must be installed,
 because of its `run_guider_csc` entry point, see Prerequisites.
 
-The Kafka broker and schema registry hold no interface definition of
-their own. Topics and Avro schemas are registered by the salobj
+Topics and Avro schemas are registered by the salobj
 process that first uses them (the CSC, or `create_topics`), from the
-`lsst.ts.xml` that process imports. So the broker ends up with the
-interface from the `ts_xml` on `PYTHONPATH`, which is why the clean
-broker start below matters: it removes schemas registered from an
-older `ts_xml`.
+`lsst.ts.xml` that process imports. The schema registry retains those
+schemas. For an interface-change test, select a fresh topic namespace
+for the CSC and watcher so earlier schemas do not interfere.
 
 ## Starting Kafka
 
@@ -60,17 +66,12 @@ older `ts_xml`.
 in the workspace root:
 
 ```bash
-COMPOSE=ts_salobj/docker-compose.yaml
-
-docker compose -f $COMPOSE rm --stop --force
-sleep 5
-docker compose -f $COMPOSE up -d
+docker compose -f ts_salobj/docker-compose.yaml up -d
 ```
 
-The `rm --stop --force` first gives a clean broker (no stale topics or
-schemas from a previous session). Check with `docker ps` that `broker`
-and `schema-registry` are up before starting the development
-container.
+Check with `docker ps` that `broker` and `schema-registry` are up
+before starting the development container. Reuse running services;
+a fresh test namespace avoids deleting existing topics or schemas.
 
 This step knows nothing about `ts_xml`: the compose file only starts
 stock Kafka, schema registry and Kafdrop images. The Guider topics and
@@ -204,14 +205,15 @@ $PYTHONPATH
 export LSST_KAFKA_BROKER_ADDR=broker:29092
 export LSST_SCHEMA_REGISTRY_URL=http://schema-registry:8081
 export LSST_SITE=test
-export LSST_TOPIC_SUBNAME=sal
+export LSST_TOPIC_SUBNAME=guider_osw2858_review_01
 export DAQ_SDK=~/ts_repos/R5-V13.16
 export LD_LIBRARY_PATH=~/readline-shim:$DAQ_SDK/x86/lib:$LD_LIBRARY_PATH
 export PATH=$DAQ_SDK/x86/bin:$PATH
 ```
 
 `LSST_TOPIC_SUBNAME` is part of the Kafka topic names and must be the
-same in every terminal.
+same in every terminal. Choose a fresh suffix for each interface-change
+test, and use that exact value in the CSC and watcher terminals.
 
 To confirm the checkouts, not the copies shipped with the image, are
 the ones being imported:
@@ -264,11 +266,35 @@ every property: salobj does not apply the schema defaults.
 2. On the first stamps: `stateMetadata: START`.
 3. After the warm-up locks: one `seriesMetadata` with the sensors and
   their ROIs, then per acquisition `offsets`, `summaryResults`,
-   `perGuiderResults` and a `stateMetadata: STAMP`.
+   `perGuiderResults` and a `stateMetadata: STAMP`. Each live combined
+   acquisition also produces a `log[INFO]` diagnostic as described below.
 4. Running `gds_emulator` again with the `000028` files starts a new
   DAQ sequence: `stateMetadata: STOP` for the old visit, `START` for
    the new one, and a fresh `seriesMetadata`.
 5. Stopping the CSC (Ctrl-C) ends the visit with a final `STOP`.
+
+### Combined-offset diagnostics
+
+The watcher displays the CSC's `logMessage` events. At INFO verbosity,
+one record beginning `Guider combined result:` is logged for every
+live combined acquisition, with these fields:
+
+| Fields | Meaning |
+|---|---|
+| `seqno`, `stamp`, `obsid`, `timestamp` | Acquisition identity matching the result events; timestamp uses the same seconds value as those events. |
+| `x_mm`, `y_mm` | Combined offsets in millimeters. |
+| `x_standard_error_mm`, `y_standard_error_mm` | Standard errors of the combined mean, formerly carried by `offsets.x_err`/`y_err` and `summaryResults.delta_x_err`/`delta_y_err`. |
+| `x_scatter_mm`, `y_scatter_mm` | Sample scatter across contributing sensors in millimeters, formerly `summaryResults.scatter_x`/`scatter_y`. |
+| `valid_sensors`, `total_sensors` | Number of contributing sensors and number of supplied measurements. The valid count also remains in `summaryResults.goodStamps`. |
+
+For fewer than two contributing sensors, standard errors and scatter
+are `nan`, preserving the pipeline's existing meaning. Each quantity
+is logged once even where two former topics carried it. The watcher
+continues to display topic offsets in micrometers; the diagnostic field
+names explicitly identify their millimeter units. Keep the CSC log
+level at INFO or more verbose to retain these records. Replayed seeds
+and final trailing results follow the existing pipeline policy and do
+not produce live result topics or these live diagnostic records.
 
 
 
@@ -284,4 +310,3 @@ one-time container setup.
 - **Stamps arrive but nothing locks.** Check the ROI size against
 `GuiderTrackerConfig.cutout_size` (50 px): the measurement window
 must fit inside the stamp.
-

@@ -102,9 +102,10 @@ class GuiderCsc(salobj.ConfigurableCsc):
 
     ``guiderGDS`` delivers stamps on a C++ worker thread and the
     pipeline callbacks fire synchronously on that thread. The
-    callbacks therefore only build SAL payloads and hand them to the
-    asyncio event loop through a thread-safe queue; `_publish_loop`
-    drains the queue and writes the topics.
+    callbacks build SAL payloads and hand them to the asyncio event
+    loop through a thread-safe queue; `_publish_loop` drains the queue
+    and writes the topics. Combined diagnostics use the CSC logger,
+    whose SAL handler also supports calls from the worker thread.
     """
 
     valid_simulation_modes = (0, 1)
@@ -407,7 +408,9 @@ class GuiderCsc(salobj.ConfigurableCsc):
         seriesMetadata once per visit (at the first combine, when the
         ROI of every locked sensor has been seen), then the STAMP
         state event, the offsets telemetry, and the summary and
-        per-guider results for the acquisition.
+        per-guider results for the acquisition. Logs the combined
+        standard errors, sensor scatter, and counts at INFO because
+        the current XML does not publish combined errors or scatter.
         """
         record = self._stamp_metadata_by_index.pop(combined.stamp_index, None)
         if record is not None:
@@ -416,6 +419,26 @@ class GuiderCsc(salobj.ConfigurableCsc):
         else:
             identity = dict(self._default_identity(), stamp=combined.stamp_index)
             sensors = ":".join(sorted(combined.measurements))
+
+        self.log.info(
+            "Guider combined result: seqno=%d stamp=%d obsid=%r "
+            "timestamp=%.9f x_mm=%.9g y_mm=%.9g "
+            "x_standard_error_mm=%.9g y_standard_error_mm=%.9g "
+            "x_scatter_mm=%.9g y_scatter_mm=%.9g "
+            "valid_sensors=%d total_sensors=%d",
+            identity["seqno"],
+            identity["stamp"],
+            identity["obsid"],
+            identity["timestamp"],
+            combined.combined_dx * PIXEL_SIZE_MM,
+            combined.combined_dy * PIXEL_SIZE_MM,
+            combined.error_dx * PIXEL_SIZE_MM,
+            combined.error_dy * PIXEL_SIZE_MM,
+            combined.scatter_dx * PIXEL_SIZE_MM,
+            combined.scatter_dy * PIXEL_SIZE_MM,
+            combined.n_valid,
+            combined.n_total,
+        )
 
         if not self._series_metadata_published:
             self._series_metadata_published = True
@@ -430,11 +453,8 @@ class GuiderCsc(salobj.ConfigurableCsc):
             dict(
                 x=combined.combined_dx * PIXEL_SIZE_MM,
                 y=combined.combined_dy * PIXEL_SIZE_MM,
-                x_err=combined.error_dx * PIXEL_SIZE_MM,
-                y_err=combined.error_dy * PIXEL_SIZE_MM,
                 # The pipeline does not measure a rotation offset yet.
                 rotation=math.nan,
-                n_sensors=combined.n_valid,
             ),
         )
         self._enqueue(
@@ -450,11 +470,11 @@ class GuiderCsc(salobj.ConfigurableCsc):
         sensor_names = sorted(self._visit_rois)
         rois = [self._visit_rois[name] for name in sensor_names]
         return dict(
-            roi_common_nrows=self._roi_shape[0],
-            roi_common_ncols=self._roi_shape[1],
+            roiCommonNrows=self._roi_shape[0],
+            roiCommonNcols=self._roi_shape[1],
             # The integration time is not carried by the stamp
             # stream; it is part of the DAQ series configuration.
-            roi_common_integration=0,
+            roiCommonIntegration=0,
             sensor=":".join(sensor_names),
             segment=padded_array([roi[0] for roi in rois], 0),
             startrow=padded_array([roi[1] for roi in rois], 0),
@@ -464,7 +484,7 @@ class GuiderCsc(salobj.ConfigurableCsc):
         )
 
     def _build_summary_results_payload(self, combined, identity):
-        # quality_flag is per sensor, in the same sorted-sensor order
+        # qualityFlag is per sensor, in the same sorted-sensor order
         # as the perGuiderResults arrays: 1 passed the quality cuts,
         # 0 failed.
         quality_flags = [
@@ -472,16 +492,12 @@ class GuiderCsc(salobj.ConfigurableCsc):
             for name in sorted(combined.measurements)
         ]
         return dict(
-            delta_x=combined.combined_dx * PIXEL_SIZE_MM,
-            delta_y=combined.combined_dy * PIXEL_SIZE_MM,
-            delta_x_err=combined.error_dx * PIXEL_SIZE_MM,
-            delta_y_err=combined.error_dy * PIXEL_SIZE_MM,
-            scatter_x=combined.scatter_dx * PIXEL_SIZE_MM,
-            scatter_y=combined.scatter_dy * PIXEL_SIZE_MM,
+            deltaX=combined.combined_dx * PIXEL_SIZE_MM,
+            deltaY=combined.combined_dy * PIXEL_SIZE_MM,
             # The pipeline does not measure a rotation offset yet.
-            delta_rotation=math.nan,
-            good_stamps=combined.n_valid,
-            quality_flag=padded_array(quality_flags, math.nan),
+            deltaRotation=math.nan,
+            goodStamps=combined.n_valid,
+            qualityFlag=padded_array(quality_flags, math.nan),
             **identity,
         )
 
@@ -518,22 +534,22 @@ class GuiderCsc(salobj.ConfigurableCsc):
             sensor=":".join(sensor_names),
             # The HSM tracking path does not measure aperture flux.
             flux=nan_array,
-            flux_err=nan_array,
+            fluxErr=nan_array,
             # Absolute DVCS centroid positions need the focal-plane
             # transform of the camera model (ROI origin + amplifier
             # to focal plane); not implemented yet. The guiding
             # quantity, the offset from the reference, is published
-            # in centroid_dx/centroid_dy in camera-frame mm.
-            centroid_x=nan_array,
-            centroid_y=nan_array,
-            centroid_x_err=nan_array,
-            centroid_y_err=nan_array,
-            centroid_dx=padded_array(centroid_dx, math.nan),
-            centroid_dy=padded_array(centroid_dy, math.nan),
-            moment_xx=padded_array(moment_xx, math.nan),
-            moment_yy=padded_array(moment_yy, math.nan),
-            moment_xy=padded_array(moment_xy, math.nan),
-            centroid_fit_quality=padded_array(
+            # in centroidDx/centroidDy in camera-frame mm.
+            centroidX=nan_array,
+            centroidY=nan_array,
+            centroidXErr=nan_array,
+            centroidYErr=nan_array,
+            centroidDx=padded_array(centroid_dx, math.nan),
+            centroidDy=padded_array(centroid_dy, math.nan),
+            momentXx=padded_array(moment_xx, math.nan),
+            momentYy=padded_array(moment_yy, math.nan),
+            momentXy=padded_array(moment_xy, math.nan),
+            centroidFitQuality=padded_array(
                 [
                     1.0 if measurement.passed_quality else 0.0
                     for measurement in measurements

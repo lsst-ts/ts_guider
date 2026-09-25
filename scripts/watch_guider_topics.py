@@ -47,9 +47,8 @@ async def show_summary_state(data) -> None:
 async def show_log_message(data) -> None:
     """Report the CSC log messages.
 
-    The CSC writes no console output of its own, so a command that
-    fails (e.g. an enable that cannot reach the DAQ) is only visible
-    here.
+    Displays combined-offset standard errors, scatter, and counts at
+    INFO, as well as command failures and their tracebacks.
     """
     print(f"log[{logging.getLevelName(data.level)}] : {data.message.strip()}")
     if data.traceback:
@@ -73,7 +72,7 @@ async def show_state_metadata(data) -> None:
 async def show_series_metadata(data) -> None:
     print(
         f"seriesMetadata   : sensors='{data.sensor}' "
-        f"roi={data.roi_common_nrows}x{data.roi_common_ncols} "
+        f"roi={data.roiCommonNrows}x{data.roiCommonNcols} "
         f"startrow={list(data.startrow)} "
         f"startcol={list(data.startcol)}"
     )
@@ -82,27 +81,24 @@ async def show_series_metadata(data) -> None:
 async def show_summary_results(data) -> None:
     print(
         f"summaryResults   : stamp={data.stamp} "
-        f"dx={data.delta_x * 1e3:+.2f} +/- {data.delta_x_err * 1e3:.2f} um "
-        f"dy={data.delta_y * 1e3:+.2f} +/- {data.delta_y_err * 1e3:.2f} um "
-        f"good_stamps={data.good_stamps}"
+        f"dx={data.deltaX * 1e3:+.2f} um "
+        f"dy={data.deltaY * 1e3:+.2f} um "
+        f"goodStamps={data.goodStamps}"
     )
 
 
 async def show_per_guider_results(data) -> None:
     sensor_names = data.sensor.split(":") if data.sensor else []
     per_sensor = " ".join(
-        f"{name}:({data.centroid_dx[i] * 1e3:+.2f},"
-        f"{data.centroid_dy[i] * 1e3:+.2f})um"
+        f"{name}:({data.centroidDx[i] * 1e3:+.2f},"
+        f"{data.centroidDy[i] * 1e3:+.2f})um"
         for i, name in enumerate(sensor_names)
     )
     print(f"perGuiderResults : stamp={data.stamp} {per_sensor}")
 
 
 async def show_offsets(data) -> None:
-    print(
-        f"offsets          : x={data.x * 1e3:+.2f} um "
-        f"y={data.y * 1e3:+.2f} um n_sensors={data.n_sensors}"
-    )
+    print(f"offsets          : x={data.x * 1e3:+.2f} um " f"y={data.y * 1e3:+.2f} um")
 
 
 async def main() -> None:
