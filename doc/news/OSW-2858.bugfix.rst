@@ -1,0 +1,1 @@
+Retained failed guide-star seeds after reaching seed_frames limit and retried reference acquisition with every new stamp, using all accumulated images for coaddition and candidate validation.
