@@ -1,0 +1,1 @@
+Added guider FITS sequences with sensor, segment, and timestamp metadata, compressed-image support, and explicit shape errors.
