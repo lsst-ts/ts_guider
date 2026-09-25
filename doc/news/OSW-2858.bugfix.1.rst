@@ -1,0 +1,2 @@
+Updated Guider publication and the topic watcher for the OSW-2943 XML field renames and removals.
+Preserved combined-offset standard errors, sensor scatter, and contributing counts in per-acquisition INFO logs with identity and units.
