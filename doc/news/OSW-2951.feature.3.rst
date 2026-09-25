@@ -1,0 +1,1 @@
+Combined quality-accepted guider offsets using camera-model geometry from sensor metadata, without falling back to raw amplifier coordinates.

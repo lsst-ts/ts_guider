@@ -16,8 +16,8 @@ amplifier image's pixel axes.
 
 For example, a reference at ``(100, 80)`` and a measurement at ``(102, 79)``
 give ``dx = +2`` and ``dy = -1`` pixels.
-Expressing these displacements in common camera axes and combining sensors
-are later stages of the guider pipeline.
+The next stage expresses these displacements in common camera axes and
+combines sensors; see :ref:`offset-combination`.
 
 Processing individual stamps
 ----------------------------------------

@@ -17,6 +17,7 @@ Using lsst.ts.guider
    :maxdepth: 1
 
    sensor_tracking
+   offset_combination
    daq_stamp_source_demo
 
 .. _lsst.ts.guider-contributing:

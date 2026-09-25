@@ -1,0 +1,1 @@
+Added offline multi-sensor FITS processing for development and validation, with accumulating seeds, reference-locking retries, acquisition-ordered results through the shortest sequence, and duplicate-sensor checks.

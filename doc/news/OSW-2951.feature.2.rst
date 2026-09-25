@@ -1,0 +1,1 @@
+Added combined guider offset results retaining per-sensor measurements, contribution counts, sample scatter, and standard errors.

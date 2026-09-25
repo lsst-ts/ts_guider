@@ -3,6 +3,7 @@
 setupRequired(ts_salobj)
 setupRequired(ts_xml)
 setupRequired(ts_config_ocs)
+setupRequired(obs_lsst)
 
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
 
