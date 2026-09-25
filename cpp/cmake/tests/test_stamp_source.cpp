@@ -47,6 +47,11 @@ TEST(StampSource, StampMetadataDefaultsToZero)
     EXPECT_EQ(md.sensor_index, 0u);
     EXPECT_EQ(md.sequence, 0u);
     EXPECT_EQ(md.stamp_index, 0u);
+    EXPECT_EQ(md.segment, 0u);
+    EXPECT_EQ(md.startrow, 0u);
+    EXPECT_EQ(md.startcol, 0u);
+    EXPECT_TRUE(md.obs_id.empty());
+    EXPECT_TRUE(md.series_id.empty());
 }
 
 TEST(StampSource, StampDefaultConstructsEmpty)
@@ -79,6 +84,11 @@ TEST(StampSource, StampCallbackRoundTripsAStampValue)
     sent.metadata.sensor_index = 3;
     sent.metadata.sequence     = 1;
     sent.metadata.stamp_index  = 7;
+    sent.metadata.segment      = 5;
+    sent.metadata.startrow     = 123;
+    sent.metadata.startcol     = 456;
+    sent.metadata.obs_id       = "image";
+    sent.metadata.series_id    = "roi";
 
     cb(sent);
 
@@ -88,6 +98,11 @@ TEST(StampSource, StampCallbackRoundTripsAStampValue)
     EXPECT_EQ(captured.metadata.sensor_index, 3u);
     EXPECT_EQ(captured.metadata.sequence, 1u);
     EXPECT_EQ(captured.metadata.stamp_index, 7u);
+    EXPECT_EQ(captured.metadata.segment, 5u);
+    EXPECT_EQ(captured.metadata.startrow, 123u);
+    EXPECT_EQ(captured.metadata.startcol, 456u);
+    EXPECT_EQ(captured.metadata.obs_id, "image");
+    EXPECT_EQ(captured.metadata.series_id, "roi");
 }
 
 TEST(StampSource, RowMajorPixelIndexing)
