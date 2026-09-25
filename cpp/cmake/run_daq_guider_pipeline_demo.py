@@ -16,15 +16,18 @@ Streaming model
 ---------------
 Stamps arrive asynchronously as ``on_stamp(pixels, metadata)`` keyed by
 ``metadata.sensor_index`` and ``metadata.stamp_index``. Each sensor
-buffers its first ``seed_frames`` stamps, locks a reference, then
-measures every stamp (the buffered seed frames are measured at lock
-time so coverage includes the warm-up stamps). Measurements are grouped by
+buffers at least ``seed_frames`` stamps before trying to lock a reference.
+Failed attempts retain all seeds and retry after each new stamp with
+the growing prefix; there is no automatic seed-count or time limit.
+After locking, every buffered seed is measured, and subsequent stamps
+are measured as they arrive. Replay fills open acquisitions without
+changing results already combined live. Measurements are grouped by
 ``stamp_index``; once a sensor is locked, each acquisition (one
 ``stamp_index`` across sensors) is combined live as soon as the next
 live one starts, so pass ``--per-frame`` to log the combined offset
-frame by frame as the stream runs. The seed warm-up frames and the
-final open frame are combined in ``finalize()`` (they do not appear in
-the live ``--per-frame`` trace, only in the end-of-run report).
+frame by frame as the stream runs. Remaining seed warm-up acquisitions
+and the final open frame are combined in ``finalize()`` (these trailing
+results appear only in the end-of-run report).
 
 A change in ``metadata.sequence`` marks a new pointing: the processor
 ends the finished visit and re-acquires on the new field's guide stars.
@@ -215,9 +218,9 @@ def _build_parser() -> argparse.ArgumentParser:
         "--seed-frames",
         type=int,
         default=GuiderTrackerConfig.seed_frames,
-        help="Warm-up stamps buffered per sensor before locking a "
-        "reference; the single default lives on GuiderTrackerConfig. "
-        "Lower it (e.g. 10 or 5) for short visits.",
+        help="Minimum stamps per sensor before the first reference-lock "
+        "attempt. Failed attempts keep their seeds and retry after every "
+        "new stamp. Defaults to GuiderTrackerConfig.seed_frames.",
     )
     parser.add_argument("--min-snr", type=float, default=10.0)
     parser.add_argument(

@@ -37,7 +37,12 @@ import numpy as np
 
 @dataclass(frozen=True)
 class GuiderTrackerConfig:
-    """Algorithm and quality-cut configuration."""
+    """Algorithm and quality-cut configuration.
+
+    ``seed_frames`` is the minimum before an automatic reference-lock
+    attempt. Failed attempts retain all seeds and retry with each new
+    stamp; this setting is not a maximum or a rolling-window length.
+    """
 
     seed_frames: int = 10
     cutout_size: int = 50

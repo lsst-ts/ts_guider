@@ -29,7 +29,12 @@ as a later live ``stamp_index`` starts, so the combined offset is
 available live, frame by frame, while the stream runs. The seed
 warm-up frames (replayed in bulk at lock time, hence out of global
 order) and the final open frame are combined by :meth:`finalize` when
-the stream stops.
+the stream stops, unless their acquisition was already combined live.
+``seed_frames`` is the minimum before the first reference attempt.
+Failed attempts retain their images and indices; each new stamp retries
+with the entire growing prefix. There is no automatic seed-count or
+time limit, so storage and retry work grow until locking succeeds or
+the series ends.
 
 Rubin observes one field, then slews to the next; each pointing is a
 separate DAQ series carrying its own ``metadata.sequence`` and its own
@@ -105,8 +110,11 @@ class StreamingGuiderProcessor:
     next live ``stamp_index`` starts (see :meth:`_maybe_combine_previous`);
     pass ``on_combined_offset`` to be notified with each one as it is
     produced (e.g. to publish telemetry or print a live trace).
-    :meth:`finalize` combines the seed warm-up frames and the final
-    open frame once the stream stops.
+    Failed reference attempts retain all seeds and retry after each new
+    stamp. Successful locking replays the whole prefix; previously
+    combined acquisitions are not reopened. :meth:`finalize` combines
+    remaining warm-up acquisitions and the final open frame once the
+    stream stops.
 
     A change in ``metadata.sequence`` marks a new pointing; the finished
     visit is ended and the per-visit state reset so the new field
@@ -300,7 +308,8 @@ class StreamingGuiderProcessor:
 
         if tracker.reference_center is None:
             self.metrics.seed_stamps += 1
-            self.seed_buffers[sensor_name].append(stamp)
+            # The callback's array may be reused before reference lock.
+            self.seed_buffers[sensor_name].append(stamp.copy())
             self.seed_indices[sensor_name].append(stamp_index)
             if len(self.seed_buffers[sensor_name]) >= self.config.seed_frames:
                 self._lock_and_replay_seed(sensor_name, tracker)
@@ -343,18 +352,20 @@ class StreamingGuiderProcessor:
         The full seed buffer (not just its coadd) is handed to
         ``lock_reference`` so it can HSM-validate candidates over the
         seed window - the streaming-compatible reference selection
-        described in the module docstring (option 2). Once locked, the
-        buffered frames are replayed through the normal measure path so
-        the offset table covers the warm-up stamps too.
+        described in the module docstring (option 2). Keep failed seeds
+        and their indices for the next attempt with a larger prefix.
+        Once locked, replay every buffered frame through the normal
+        measure path, retaining results for still-open acquisitions.
         """
         seed_stamps = self.seed_buffers[sensor_name]
         seed_indices = self.seed_indices[sensor_name]
         lock_start = perf_counter()
         locked = tracker.lock_reference(np.stack(seed_stamps))
         self.metrics.lock_times.append(perf_counter() - lock_start)
-        if locked:
-            for stamp_index, stamp in zip(seed_indices, seed_stamps):
-                self._measure_and_store(sensor_name, tracker, stamp_index, stamp)
+        if not locked:
+            return
+        for stamp_index, stamp in zip(seed_indices, seed_stamps):
+            self._measure_and_store(sensor_name, tracker, stamp_index, stamp)
         self.seed_buffers[sensor_name] = []
         self.seed_indices[sensor_name] = []
 
@@ -369,7 +380,11 @@ class StreamingGuiderProcessor:
         measure_start = perf_counter()
         measurement = tracker.measure(stamp)
         self.metrics.measure_times.append(perf_counter() - measure_start)
-        self.acquisitions.setdefault(stamp_index, {})[sensor_name] = measurement
+        # A later-locking sensor can replay seeds that another sensor
+        # already caused to be combined. Count the measurement below,
+        # but do not reopen a completed acquisition or revise its result.
+        if stamp_index not in self._combined_indices:
+            self.acquisitions.setdefault(stamp_index, {})[sensor_name] = measurement
         if measurement.passed_quality:
             self.metrics.valid_measurements += 1
         else:
@@ -436,10 +451,9 @@ class StreamingGuiderProcessor:
         completed live; :meth:`finalize` combines its trailing frames
         with ``notify=False`` as end-of-stream cleanup.
 
-        A late measurement for an already-combined ``stamp_index``
-        (e.g. delivered out of order) reopens an entry in
-        ``self.acquisitions``; ``self._combined_indices`` guards against
-        combining it twice.
+        Measurements replayed for an already-combined ``stamp_index``
+        are not stored in ``self.acquisitions``. The index guard also
+        prevents repeated calls from combining the same result twice.
         """
         if stamp_index in self._combined_indices:
             return

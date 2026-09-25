@@ -85,11 +85,16 @@ class SensorTracker:
         stream, but it is stateful and deferred until a real need
         appears.
 
+        Every supplied image contributes to the coadd and candidate
+        validation. ``config.seed_frames`` is the automatic callers'
+        minimum before their first attempt, not a limit on this cube.
+        Callers retry with growing prefixes until a reference is found.
+
         Returns True when a reference position was locked.
         """
         self.stamp_shape = (seed_stamps.shape[1], seed_stamps.shape[2])
-        reference_image = build_reference_image(seed_stamps, self.config.seed_frames)
-        seed_window = seed_stamps[: self.config.seed_frames]
+        reference_image = build_reference_image(seed_stamps, len(seed_stamps))
+        seed_window = seed_stamps
 
         candidates = find_candidate_centroids(reference_image, self.config)
         if not candidates:

@@ -22,7 +22,8 @@ __all__ = ["CONFIG_SCHEMA"]
 
 import yaml
 
-CONFIG_SCHEMA = yaml.safe_load("""
+CONFIG_SCHEMA = yaml.safe_load(
+    """
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_guider/blob/main/python/lsst/ts/guider/config_schema.py
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
@@ -35,7 +36,9 @@ properties:
     type: string
   seed_frames:
     description: >-
-      Number of stamps buffered per sensor before locking a guide star.
+      Minimum number of stamps per sensor before attempting to lock a
+      guide star. Failed attempts retain all seeds and retry with each
+      new stamp, without an automatic seed-count or time limit.
       Optional; defaults to the pipeline value when omitted.
     type: integer
     minimum: 1
@@ -48,4 +51,5 @@ properties:
 required:
   - partition
 additionalProperties: false
-""")
+"""
+)
