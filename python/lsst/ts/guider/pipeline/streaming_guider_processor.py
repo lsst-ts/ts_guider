@@ -361,8 +361,7 @@ class StreamingGuiderProcessor:
         Raises
         ------
         RuntimeError
-            If a tracker returns measurements, timings, and acquisition
-            indices whose lengths disagree.
+            If tracker measurements, timings, and indices differ in length.
 
         Notes
         -----
