@@ -243,10 +243,53 @@ Decoder and emulator validation
 ----------------------------------------
 
 The SDK-free and binding tests above do not verify that the decoder reads
-ROI metadata from START or image labels from RESUME. Exercising that
-decoder path requires the SDK and a running test partition. A complete
-streaming check additionally needs the binding, a receiver, and an
-emulator producing known stamps.
+ROI metadata from START or image labels from RESUME. The decoder tests
+call the actual C++ callbacks to check per-sensor metadata, image changes,
+new series, and delivered pixels. They also check that an incorrect stamp
+size prevents delivery and a consumer exception propagates. They require
+the SDK and a running test partition because the SDK decoder constructor
+looks up that partition. They do not receive emulator traffic.
+
+Build the decoder tests with both CMake switches enabled:
+
+.. code-block:: bash
+
+   cmake -S cpp/cmake -B cpp/cmake/build_decoder \
+       -DBUILD_MODULE=ON -DBUILD_TESTS=ON \
+       -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF
+   cmake --build cpp/cmake/build_decoder -j2
+
+This builds the binding, stamp model tests, and ``test_decoder``. With
+``BUILD_MODULE=OFF``, only the SDK-free stamp model tests are built.
+
+In another terminal with the SDK environment activated, start an owned
+test partition on the prepared interface. Use a unique partition name and
+a temporary directory for its files:
+
+.. code-block:: bash
+
+   GUIDER_TEST_SITE=$(mktemp -d)
+   dsid_standalone -i lsst-daq -p guider-decoder-test -s "$GUIDER_TEST_SITE"
+
+Once the service is ready, run the tests from the repository root in the
+build terminal, using the same partition name:
+
+.. code-block:: bash
+
+   GUIDER_TEST_PARTITION=guider-decoder-test \
+       ctest --test-dir cpp/cmake/build_decoder --output-on-failure
+
+An unset or empty ``GUIDER_TEST_PARTITION`` makes the decoder tests report
+``Skipped``; the stamp model tests still run. Check that the decoder cases
+actually passed. With a partition name set, SDK lookup or initialization
+errors fail the test instead of skipping it. CTest limits each decoder
+case to 20 seconds.
+Stop the service with Ctrl-C in its terminal when testing is complete.
+If using an existing test partition, omit the service command and set
+``GUIDER_TEST_PARTITION`` to its name instead.
+
+A complete streaming check additionally needs the binding, a receiver,
+and an emulator producing known stamps.
 
 Before such a run, prepare the network and runtime libraries, choose a
 test partition you control, and provide suitable FITS input for the
