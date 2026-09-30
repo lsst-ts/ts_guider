@@ -10,6 +10,9 @@ The defaults preserve the original demo: partition ``gds-emu``, 400 stamps,
 and a 100-second timeout. The default log level is ``INFO``.
 This exercises the DAQ Python bindings; it does not calculate guider offsets.
 
+To track reference stars and report combined offsets from the same stream,
+use the :ref:`DAQ guider pipeline demo <daq-guider-pipeline-demo>`.
+
 Use ``--log-level`` to select ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR``, or
 ``CRITICAL`` (case-insensitive). Stamp metadata and the final count use
 ``INFO``; a timeout uses ``WARNING``. Logging writes to standard error.
