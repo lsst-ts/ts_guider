@@ -32,13 +32,16 @@ public:
             const GDS::LocationSet&  locations,
             ::guider::StampCallback  on_stamp);
 
-private:
+protected:
+    // Allow a test subclass to exercise metadata delivery through these callbacks.
     void start    (const GDS::StateMetadata& state, const GDS::SeriesMetadata& series);
     void resume   (const GDS::StateMetadata& state);
+    void stamp    (const GDS::StateMetadata& state, const GDS::Stamp& stamp);
+
+private:
     void pause    (const GDS::StateMetadata& state);
     void stop     (const GDS::StateMetadata& state);
     void raw_stamp(const GDS::StateMetadata& state, const GDS::RawStamp&       stamp);
-    void stamp    (const GDS::StateMetadata& state, const GDS::Stamp&          stamp);
 
     uint8_t* allocate(unsigned size);
 
