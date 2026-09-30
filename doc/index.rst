@@ -16,6 +16,7 @@ Using lsst.ts.guider
 .. toctree::
    :maxdepth: 1
 
+   installation
    sensor_tracking
    offset_combination
    decoding_raft_sensor_names
