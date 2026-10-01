@@ -1,0 +1,3 @@
+Added StreamingGuiderProcessor to combine live multi-sensor measurements by acquisition in camera coordinates.
+Handled reference selection, buffered measurements, series changes.
+Recorded measurement counts and processing times with StreamingMetrics.
