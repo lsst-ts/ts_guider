@@ -29,6 +29,9 @@ import numpy as np
 
 from .measurement_state import MeasurementState
 
+FWHM_PER_SIGMA = 2.355
+"""Rounded Gaussian FWHM-to-sigma ratio used for guider measurements."""
+
 
 @dataclass
 class CentroidMeasurement:
