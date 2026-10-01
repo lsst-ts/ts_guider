@@ -65,20 +65,25 @@ Python tests without a DAQ connection
 ----------------------------------------
 
 The following tests exercise detection, tracking, camera transformations,
-offset combination, and the stamp-source demo's Python handling:
+offset combination, streaming coordination, and demo handling:
 
 .. code-block:: bash
 
-   env -u CCSDAQ python -m pytest -q \
+   env -u CCSDAQ -u GUIDER_RUN_EMULATOR python -m pytest -q \
        tests/test_guider_tracker_config.py tests/test_centroid_measurement.py \
        tests/test_detection.py tests/test_sensor_tracker.py \
        tests/test_guider_orientation.py tests/test_offset_combiner.py \
-       tests/test_multi_sensor_runner.py tests/test_daq_stamp_source_demo.py
+       tests/test_multi_sensor_runner.py tests/test_daq_stamp_source_demo.py \
+       tests/test_sensor_identifiers.py tests/test_streaming_guider_processor.py \
+       tests/test_daq_guider_pipeline_demo.py tests/test_daq_emulator.py
 
 They need the LSST Python environment and pytest, but no live DAQ partition
 or Kafka service. ``env -u CCSDAQ`` prevents the repository's pytest setup
 hook from trying to build the binding when it is absent. It affects only
 this command; the shell's SDK setting is retained.
+The command also unsets ``GUIDER_RUN_EMULATOR``, so ``test_daq_emulator.py``
+runs its cleanup checks and skips the live integration case. See the opt-in
+command below for a run with actual DAQ traffic.
 
 The full repository suite also includes CSC tests, which need the salobj
 test environment, Kafka services, and compatible XML and configuration
@@ -288,22 +293,46 @@ Stop the service with Ctrl-C in its terminal when testing is complete.
 If using an existing test partition, omit the service command and set
 ``GUIDER_TEST_PARTITION`` to its name instead.
 
-A complete streaming check additionally needs the binding, a receiver,
-and an emulator producing known stamps.
+The opt-in emulator test exercises the full path from DAQ traffic through
+the binding, tracker, and camera-coordinate combination. After preparing
+the network and runtime libraries and building the binding, run:
 
-Before such a run, prepare the network and runtime libraries, choose a
-test partition you control, and provide suitable FITS input for the
-installed emulator. The :ref:`stamp-source guide <daq-stamp-source-demo>`
-shows the service, subscriber, and emulator startup order. That demo
-checks stamp delivery; ``run_daq_guider_pipeline_demo`` also performs
-tracking and offset combination as described in
-:ref:`streaming-guider-pipeline`.
+.. code-block:: bash
 
-Use equal stamp dimensions across sensors with the current decoder and
-emulator setup. Track which services the test starts, stop and join the
-stamp source before normal finalization, and clean up only test-owned
-services. A successful build or a skipped test does not establish that
-live traffic or decoder metadata processing worked.
+   export PYTHONPATH="$GUIDER_REPO/cpp/cmake/build_decoder:$PYTHONPATH"
+   python -c "import guiderGDS; print(guiderGDS.__file__)"
+   GUIDER_EMULATOR_RESULTS=$(mktemp -d)
+   GUIDER_RUN_EMULATOR=1 python -m pytest -q -rs tests/test_daq_emulator.py \
+       --basetemp="$GUIDER_EMULATOR_RESULTS/pytest"
+
+The test creates its own partition service, using a name derived from the
+test process ID, and runs the SDK's ``gds_emulator``. It generates two FITS
+inputs with equal stamp dimensions and known star motion. The 48 received
+stamps cover three series, with sequence numbers ``65535``, ``0``, and ``1``.
+Assertions check pixel values, camera offsets, reference selection in each
+series, and changed ROI origins and labels. This SDK's FITS emulator sends
+START, STAMP, and STOP; the separate decoder tests cover RESUME metadata.
+
+No separately started partition service or FITS input is needed for this
+test. It uses the prepared ``lsst-daq`` interface by default and does not
+create interfaces or change host settings. ``GUIDER_EMULATOR_INTERFACE``
+can select another interface for the partition service, provided the SDK
+receiver is configured consistently. To run the C++ decoder cases against
+the same owned partition too, set ``GUIDER_DECODER_TEST`` to the absolute
+path of ``cpp/cmake/build_decoder/tests/test_decoder``.
+
+The test stops and joins its stamp source before normal finalization and
+always attempts to stop its own partition service. Processing or shutdown
+failures prevent finalization; cleanup failures are attached to the
+original error. Service and emulator logs are retained under the chosen
+results directory, along with ``results.json`` after a successful run.
+When explicitly enabled, a missing binding, SDK program, or working DAQ
+setup fails the test instead of skipping it. Confirm that the live case
+passed; a successful build or an intentional skip does not validate traffic.
+
+For a manual service/subscriber/emulator session, see the
+:ref:`stamp-source guide <daq-stamp-source-demo>` and
+:ref:`live pipeline demo <daq-guider-pipeline-demo>`.
 
 Build the documentation
 ----------------------------------------
