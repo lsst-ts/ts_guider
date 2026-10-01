@@ -30,7 +30,7 @@ import galsim
 import numpy as np
 from astropy.nddata import Cutout2D
 
-from .centroid_measurement import CentroidMeasurement
+from .centroid_measurement import FWHM_PER_SIGMA, CentroidMeasurement
 from .detection import Detection
 from .guider_tracker_config import GuiderTrackerConfig
 from .guiding_status import GuidingStatus
@@ -497,7 +497,7 @@ class SensorTracker:
             x=float(centroid_x + cutout.xmin_original),
             y=float(centroid_y + cutout.ymin_original),
             snr=float(signal_to_noise),
-            fwhm=float(2.355 * sigma),
+            fwhm=float(FWHM_PER_SIGMA * sigma),
             e1=float(hsm_result.observed_shape.e1),
             e2=float(hsm_result.observed_shape.e2),
             state=MeasurementState.CONVERGED,
