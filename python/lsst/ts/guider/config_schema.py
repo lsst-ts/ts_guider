@@ -30,6 +30,25 @@ $id: https://github.com/lsst-ts/ts_guider/blob/main/python/lsst/ts/guider/config
 title: Guider v1
 description: Schema for Guider configuration files
 type: object
-properties: {}
+properties:
+  partition:
+    description: DAQ/GDS partition to subscribe to for guider stamps.
+    type: string
+  seed_frames:
+    description: >-
+      Minimum number of stamps collected per sensor before the first
+      reference-selection attempt. After an unsuccessful attempt, retain
+      the stamps and retry with each new stamp using all accumulated images.
+      Optional; defaults to GuiderTrackerConfig.seed_frames when omitted.
+    type: integer
+    minimum: 1
+  min_snr:
+    description: >-
+      Minimum aperture signal-to-noise ratio for an accepted stamp
+      measurement. Optional; defaults to GuiderTrackerConfig.min_snr
+      when omitted.
+    type: number
+required:
+  - partition
 additionalProperties: false
 """)

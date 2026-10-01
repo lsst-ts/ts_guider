@@ -19,10 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import pathlib
 import unittest
 
 from lsst.ts import guider, salobj
 from lsst.ts.xml.enums.Guider import SalIndex
+
+TEST_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
 class GuiderCscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -39,12 +42,13 @@ class GuiderCscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             name="Guider",
             index=SalIndex.MAIN_TEL,
             exe_name="run_guider_csc",
+            cmdline_args=("--configdir", str(TEST_CONFIG_DIR)),
         )
 
     async def test_standard_state_transitions(self):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
-            config_dir=None,
+            config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
         ):
             await self.check_standard_state_transitions(enabled_commands=())
