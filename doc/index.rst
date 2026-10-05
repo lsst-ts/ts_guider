@@ -23,6 +23,7 @@ Using lsst.ts.guider
    streaming_guider_pipeline
    daq_stamp_source_demo
    daq_guider_pipeline_demo
+   guider_csc
 
 .. _lsst.ts.guider-contributing:
 
