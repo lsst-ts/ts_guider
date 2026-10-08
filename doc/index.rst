@@ -24,6 +24,7 @@ Using lsst.ts.guider
    daq_stamp_source_demo
    daq_guider_pipeline_demo
    guider_csc
+   running_guider_csc
 
 .. _lsst.ts.guider-contributing:
 
