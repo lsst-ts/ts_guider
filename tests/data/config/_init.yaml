@@ -1,0 +1,3 @@
+partition: test
+seed_frames: 5
+min_snr: 5.0
