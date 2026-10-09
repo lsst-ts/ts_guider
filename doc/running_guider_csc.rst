@@ -144,12 +144,28 @@ List the helper commands without starting any services::
 
     bash scripts/run_guider_emulator.sh --help
 
-Run the existing CSC command and state-transition tests with Kafka::
+Run the CSC image-processing and lifecycle tests with Kafka::
 
     bash scripts/run_guider_emulator.sh test
 
-These tests use no DAQ input and do not check image measurements. The
-:ref:`installation guide <guider-installation>` lists the processing,
+These tests supply simulated images directly to the CSC, without a DAQ
+subscription.
+
+To check the complete emulator-to-Kafka path, prepare a separate development
+container using steps 1 and 2, without starting the four manual components.
+Then run::
+
+    bash scripts/run_guider_emulator.sh test-emulator
+
+This test creates its own FITS images, partition service, CSC, and Remote.
+It checks two series and four live results, then stops the processes it
+started. It uses a random Kafka topic subname and removes its topics and
+schemas afterward. The printed artifact directory retains input images,
+logs, and received samples, including on failure. Missing prerequisites
+fail the test. Without ``GUIDER_RUN_EMULATOR=1``, the acceptance test is
+skipped; the helper sets this flag for you.
+
+The :ref:`installation guide <guider-installation>` lists the processing,
 binding, and standalone emulator tests.
 
 * **Missing SDK libraries:** run ``setup`` in a new container before ``build``.
