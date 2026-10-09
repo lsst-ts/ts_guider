@@ -16,9 +16,13 @@ Using lsst.ts.guider
 .. toctree::
    :maxdepth: 1
 
+   installation
    sensor_tracking
    offset_combination
+   decoding_raft_sensor_names
+   streaming_guider_pipeline
    daq_stamp_source_demo
+   daq_guider_pipeline_demo
 
 .. _lsst.ts.guider-contributing:
 

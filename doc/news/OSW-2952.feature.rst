@@ -1,0 +1,1 @@
+Carried per-sensor ROI origins and image/series labels from the DAQ decoder into Python stamp metadata and stamp-source demo logs.

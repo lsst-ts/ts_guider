@@ -1,0 +1,1 @@
+Documented the streaming pipeline's call flow, reference selection, acquisition combination, series lifecycle, and callbacks.
