@@ -1,0 +1,1 @@
+Documented local emulator setup, C++ builds, CSC and topic-watcher commands, unit tests, and troubleshooting.
