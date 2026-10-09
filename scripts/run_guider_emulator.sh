@@ -32,13 +32,14 @@ case "$guider_command" in
         cat <<'HELP'
 Usage: bash scripts/run_guider_emulator.sh COMMAND [FITS_FILES...]
 
-  setup      Prepare a new container's DAQ interface and library aliases.
-  build      Compile guiderGDS, install the Python package, and check imports.
-  test       Run CSC tests using Kafka, without a DAQ subscription.
-  partition  Start the configured DAQ partition service.
-  watch      Display the CSC's topics and diagnostic logs.
-  csc        Start the CSC enabled, receiving DAQ stamps.
-  emulator   Replay the supplied FITS files twice (one file per sensor).
+  setup          Prepare a new container's DAQ interface and library aliases.
+  build          Compile guiderGDS, install the Python package, and check imports.
+  test           Run CSC tests using Kafka, without a DAQ subscription.
+  test-emulator  Run DAQ/CSC/Kafka acceptance in a dedicated container.
+  partition      Start the configured DAQ partition service.
+  watch          Display the CSC's topics and diagnostic logs.
+  csc            Start the CSC enabled, receiving DAQ stamps.
+  emulator       Replay the supplied FITS files twice (one file per sensor).
 
 Run partition, watch, csc, and emulator in separate container terminals.
 Each command reads ~/guider_emulator.env; set GUIDER_EMULATOR_SETTINGS
@@ -47,7 +48,7 @@ Ctrl-C stops the component in that terminal.
 HELP
         exit 0
         ;;
-    setup|build|test|partition|watch|csc)
+    setup|build|test|test-emulator|partition|watch|csc)
         if [[ $# -ne 0 ]]; then
             echo "$guider_command does not accept additional arguments." >&2
             exit 2
@@ -131,6 +132,10 @@ case "$guider_command" in
     test)
         cd "$GUIDER_REPO"
         exec env -u CCSDAQ -u GUIDER_RUN_EMULATOR python -m pytest -q tests/test_csc.py
+        ;;
+    test-emulator)
+        cd "$GUIDER_REPO"
+        exec env GUIDER_RUN_EMULATOR=1 python -m pytest -q -s tests/test_csc_emulator.py
         ;;
     watch)
         exec watch_guider_topics --index "$GUIDER_INDEX"
