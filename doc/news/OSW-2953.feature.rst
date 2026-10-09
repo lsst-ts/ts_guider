@@ -1,0 +1,4 @@
+Integrated the streaming guider processor with CSC configuration, DAQ acquisition, simulated stamp input, and enable/disable transitions.
+Added fault handling and deadlines for stopping acquisition and draining queued publications.
+Published acquisition metadata, camera-frame offsets in millimeters, and per-sensor quality and shape moments through Guider events and telemetry.
+Added diagnostic logs with combined offsets, uncertainties, scatter, and contributing sensor counts.
