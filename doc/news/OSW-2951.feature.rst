@@ -1,1 +1,3 @@
-Added camera-model amplifier flips and detector rotations for guider pixel offsets, with lazy camera construction and orientation inspection.
+Added camera-model amplifier flips and detector rotations
+for guider pixel offsets,
+with lazy camera construction and orientation inspection.

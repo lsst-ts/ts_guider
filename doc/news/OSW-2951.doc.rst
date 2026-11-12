@@ -1,1 +1,2 @@
-Documented camera-coordinate transforms, offset statistics, metadata requirements, and offline reference and acquisition processing.
+Documented camera-coordinate transforms, offset statistics,
+metadata requirements, and offline reference and acquisition processing.
