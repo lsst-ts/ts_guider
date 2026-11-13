@@ -61,7 +61,7 @@ class MultiSensorRunner:
         stay in amplifier coordinates and must already share an orientation.
     orientation : `GuiderOrientation`, optional
         Camera-model transform provider, optionally shared with other
-        runners. The default builds its camera lazily on first use.
+        runners. The default initializes its camera during construction.
     """
 
     def __init__(
