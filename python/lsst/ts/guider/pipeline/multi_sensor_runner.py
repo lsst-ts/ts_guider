@@ -31,7 +31,7 @@ import numpy as np
 from ..guider_orientation import GuiderOrientation
 from .centroid_measurement import CentroidMeasurement
 from .combined_offset import CombinedOffset
-from .fits_io import read_guider_sequence
+from .guider_sequence import GuiderSequence
 from .guider_tracker_config import GuiderTrackerConfig
 from .offset_combiner import OffsetCombiner, build_sensor_amplifiers
 from .sensor_tracker import SensorTracker
@@ -211,7 +211,7 @@ def run_offline(
     sequences = {}
     sensor_paths: dict[str, Path] = {}
     for path in fits_paths:
-        sequence = read_guider_sequence(path)
+        sequence = GuiderSequence.from_fits(path)
         sensor_name = sequence.sensor_name
         if sensor_name in sequences:
             raise ValueError(
