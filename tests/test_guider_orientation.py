@@ -26,7 +26,6 @@ import pytest
 from lsst.ts.guider.guider_orientation import (
     GuiderOrientation,
     amplifier_name_from_segment,
-    generate_orientation_table,
 )
 
 
@@ -77,8 +76,9 @@ def test_real_camera_corner_orientations(sensor, expected):
     assert orientation.amplifier_to_camera_offset(2, -1, sensor, "C05") == expected
 
 
-def test_orientation_table_contains_all_eight_guiders():
-    table = generate_orientation_table()
+def test_orientation_table_contains_all_eight_guiders(capsys):
+    orientation = GuiderOrientation()
+    table = orientation.generate_orientation_table()
     expected = {
         f"{raft}_SG{sensor}"
         for raft in ("R00", "R04", "R40", "R44")
@@ -86,6 +86,12 @@ def test_orientation_table_contains_all_eight_guiders():
     }
     assert set(table) == expected
     assert all("C05" in entry["amplifier_flip"] for entry in table.values())
+
+    orientation.print_orientation_table()
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0].split()[:3] == ["detector", "detId", "nQuarter"]
+    assert len(lines[2:]) == len(expected)
+    assert {line.split()[0] for line in lines[2:]} == expected
 
 
 @pytest.mark.parametrize(
