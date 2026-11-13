@@ -57,10 +57,9 @@ class OffsetCombiner:
         amplifiers present in the camera model.
     orientation : `guider_orientation.GuiderOrientation`, optional
         Source of the per-sensor flip and rotation, read from the LSST
-        camera model. Defaults to a fresh :class:`GuiderOrientation`
-        (which builds the camera lazily on the first camera-frame
-        transform). Pass a shared instance to reuse one camera across
-        drivers.
+        camera model. Defaults to a fresh :class:`GuiderOrientation`,
+        which initializes its camera during construction. Pass a shared
+        instance to reuse one camera across drivers.
     """
 
     def __init__(
