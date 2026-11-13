@@ -24,10 +24,10 @@ import pytest
 from astropy.io import fits
 from lsst.ts.guider.pipeline import (
     Detection,
+    GuiderSequence,
     GuiderTrackerConfig,
     MeasurementState,
     MultiSensorRunner,
-    read_guider_sequence,
     run_offline,
 )
 
@@ -86,7 +86,7 @@ def aligned_sequences(tmp_path):
 def test_fits_round_trip_preserves_stamps_and_metadata(aligned_sequences):
     paths, sequences, _ = aligned_sequences
     for path in paths:
-        sequence = read_guider_sequence(path)
+        sequence = GuiderSequence.from_fits(path)
         assert sequence.sensor_name == path.stem
         assert sequence.segment == "Segment05"
         assert sequence.stamps.dtype == np.float32
@@ -165,7 +165,7 @@ def test_fits_missing_metadata_uses_filename_and_nan_timestamp(tmp_path):
     fits.HDUList(
         [fits.PrimaryHDU(), fits.ImageHDU(), fits.ImageHDU(np.ones((3, 4)))]
     ).writeto(path)
-    sequence = read_guider_sequence(path)
+    sequence = GuiderSequence.from_fits(path)
     assert sequence.sensor_name == "sensor"
     assert sequence.segment is None
     assert sequence.n_stamps == 1
@@ -176,7 +176,7 @@ def test_fits_without_images_raises(tmp_path):
     path = tmp_path / "empty.fits"
     fits.HDUList([fits.PrimaryHDU()]).writeto(path)
     with pytest.raises(ValueError, match="No image stamps"):
-        read_guider_sequence(path)
+        GuiderSequence.from_fits(path)
 
 
 def test_fits_incompatible_stamp_shapes_raise_with_filename(tmp_path):
@@ -189,7 +189,7 @@ def test_fits_incompatible_stamp_shapes_raise_with_filename(tmp_path):
         ]
     ).writeto(path)
     with pytest.raises(ValueError, match="Incompatible stamp shapes.*shapes.fits"):
-        read_guider_sequence(path)
+        GuiderSequence.from_fits(path)
 
 
 def test_fits_skips_non_image_extensions_without_realigning(tmp_path):
@@ -203,7 +203,7 @@ def test_fits_skips_non_image_extensions_without_realigning(tmp_path):
             fits.ImageHDU(np.full((3, 4), 2)),
         ]
     ).writeto(path)
-    sequence = read_guider_sequence(path)
+    sequence = GuiderSequence.from_fits(path)
     assert sequence.n_stamps == 2
     np.testing.assert_array_equal(sequence.stamps[:, 0, 0], [1, 2])
     assert np.all(np.isnan(sequence.timestamps_mjd))
