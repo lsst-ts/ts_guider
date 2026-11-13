@@ -140,7 +140,7 @@ for example, ``Segment05`` selects amplifier ``C05``.
 Offline FITS processing
 -----------------------
 
-``read_guider_sequence`` reads the emulator layout:
+:meth:`GuiderSequence.from_fits` reads the emulator layout:
 a metadata-only primary HDU
 followed by a two-dimensional image extension for each stamp.
 Compressed image extensions are supported.
@@ -269,7 +269,7 @@ API reference
 
 The :ref:`sensor-tracking` API reference includes ``GuiderSequence``,
 ``CombinedOffset``, ``OffsetCombiner``, ``MultiSensorRunner``,
-``read_guider_sequence``, ``build_sensor_amplifiers``, and ``run_offline``.
+``build_sensor_amplifiers``, and ``run_offline``.
 ``GuiderOrientation`` initializes the camera when constructed,
 or uses a camera supplied by the caller.
 Its ``generate_orientation_table()`` method returns the guide-sensor geometry;
