@@ -23,18 +23,20 @@ from __future__ import annotations
 
 __all__ = ["GuiderSequence"]
 
-from dataclasses import dataclass
+from pathlib import Path
+from typing import Self
 
 import numpy as np
+from astropy.io import fits
 
 
-@dataclass
 class GuiderSequence:
     """All stamps of one guide sequence for a single sensor.
 
     ``stamps`` has shape ``(frames, rows, columns)``. ``timestamps_mjd``
     contains each stamp's ``STMPTMJD`` header value, or NaN if absent.
     ``segment`` is the FITS ``ROISEG`` value, such as ``"Segment05"``.
+    Use :meth:`from_fits` to construct a sequence from a FITS file.
 
     Parameters
     ----------
@@ -53,12 +55,83 @@ class GuiderSequence:
         form ``SegmentNN`` and an amplifier present in the camera model.
     """
 
-    stamps: np.ndarray
-    timestamps_mjd: np.ndarray
-    sensor_name: str
-    segment: str | None = None
+    def __init__(
+        self,
+        stamps: np.ndarray,
+        timestamps_mjd: np.ndarray,
+        sensor_name: str,
+        segment: str | None = None,
+    ):
+        self.stamps = stamps
+        self.timestamps_mjd = timestamps_mjd
+        self.sensor_name = sensor_name
+        self.segment = segment
 
     @property
     def n_stamps(self) -> int:
         """Number of frames in the stamp cube."""
         return self.stamps.shape[0]
+
+    @classmethod
+    def from_fits(cls, filepath: Path) -> Self:
+        """Read an emulator guider FITS file into a stamp cube.
+
+        The emulator layout is a metadata-only primary HDU followed by one
+        compressed image extension per stamp, each carrying a ``STMPTMJD``
+        timestamp. The sensor name is taken from ``RAFTBAY``/``CCDSLOT``.
+
+        Parameters
+        ----------
+        filepath : `pathlib.Path`
+            FITS file to read. Compressed image extensions are supported.
+
+        Returns
+        -------
+        sequence : `GuiderSequence`
+            Float32 stamp cube in extension order, timestamps in MJD (NaN
+            when absent), sensor name, and optional ``ROISEG`` metadata.
+            If both sensor-name header fields are absent, use the filename
+            stem. Segment metadata is retained for later camera validation.
+
+        Raises
+        ------
+        ValueError
+            If no two-dimensional image extensions exist, their shapes
+            differ, or a supplied timestamp cannot be converted to a float.
+            FITS opening/reading errors propagate.
+
+        Notes
+        -----
+        Empty and non-2D extensions are skipped. No timestamp matching or
+        acquisition realignment occurs. A missing acquisition in one file
+        therefore invalidates index alignment with other sensor files.
+        """
+        with fits.open(filepath) as hdulist:
+            primary_header = hdulist[0].header
+            raft_bay = primary_header.get("RAFTBAY", "")
+            ccd_slot = primary_header.get("CCDSLOT", "")
+            sensor_name = f"{raft_bay}_{ccd_slot}".strip("_") or filepath.stem
+            roi_segment = primary_header.get("ROISEG")
+
+            frames: list[np.ndarray] = []
+            timestamps: list[float] = []
+            for hdu in hdulist[1:]:
+                if hdu.data is None or hdu.data.ndim != 2:
+                    continue
+                if frames and hdu.data.shape != frames[0].shape:
+                    raise ValueError(
+                        f"Incompatible stamp shapes in {str(filepath)!r}: "
+                        f"{frames[0].shape} and {hdu.data.shape}."
+                    )
+                frames.append(hdu.data.astype(np.float32))
+                timestamps.append(float(hdu.header.get("STMPTMJD", np.nan)))
+
+        if not frames:
+            raise ValueError(f"No image stamps found in '{filepath}'.")
+
+        return cls(
+            stamps=np.stack(frames, axis=0),
+            timestamps_mjd=np.array(timestamps, dtype=float),
+            sensor_name=sensor_name,
+            segment=str(roi_segment) if roi_segment is not None else None,
+        )
