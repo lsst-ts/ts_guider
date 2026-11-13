@@ -1,2 +1,3 @@
-Added guider FITS sequences with sensor, segment, and timestamp metadata,
-compressed-image support, and explicit shape errors.
+Added ``GuiderSequence`` and its ``from_fits`` constructor
+for reading guider stamps and their sensor, segment, and timestamp metadata,
+with compressed-image support and explicit shape errors.
