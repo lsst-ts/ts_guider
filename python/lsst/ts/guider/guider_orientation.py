@@ -24,12 +24,13 @@ from __future__ import annotations
 __all__ = [
     "GuiderOrientation",
     "amplifier_name_from_segment",
-    "generate_orientation_table",
 ]
 
 import re
 
 import numpy as np
+from lsst.afw import cameraGeom
+from lsst.obs.lsst import LsstCam
 
 # Integer rotation matrices for k counter-clockwise quarter turns,
 # mirroring ``lsst.summit.utils.guiders`` ROTATION_MATRICES. Row form:
@@ -91,8 +92,8 @@ class GuiderOrientation:
        degree turns), fixed per CCD.
 
     The flip and rotation values come from ``lsst.obs.lsst.LsstCam`` at
-    runtime, not from a static table. The camera itself is built lazily
-    on first access and reused; ``get_nquarter`` and
+    runtime, not from a static table. The camera is initialized in the
+    constructor and reused; ``get_nquarter`` and
     ``get_amplifier_flip`` read from that same camera on each transform.
     Combination transforms each contributing sensor's offset for each
     acquisition; there is no separate orientation cache.
@@ -100,22 +101,13 @@ class GuiderOrientation:
     Parameters
     ----------
     camera : `lsst.afw.cameraGeom.Camera`, optional
-        Camera to read. Defaults to ``LsstCam.getCamera()``, built on
-        first use. Pass an existing camera to share one across the
-        pipeline and avoid a second build.
+        Camera to read. If omitted, call ``LsstCam.getCamera()`` during
+        construction. Pass an existing camera to share one across the
+        pipeline.
     """
 
     def __init__(self, camera=None):
-        self._camera = camera
-
-    @property
-    def camera(self):
-        """The camera model, built on first access."""
-        if self._camera is None:
-            from lsst.obs.lsst import LsstCam
-
-            self._camera = LsstCam.getCamera()
-        return self._camera
+        self.camera = camera if camera is not None else LsstCam.getCamera()
 
     def get_nquarter(self, detector_name: str) -> int:
         """Return the detector ``nQuarter``.
@@ -229,73 +221,54 @@ class GuiderOrientation:
             ccd_image = np.flipud(ccd_image)
         return np.rot90(ccd_image, -self.get_nquarter(detector_name))
 
+    def generate_orientation_table(self) -> dict[str, dict]:
+        """Read the guide-sensor orientation table from this camera.
 
-def generate_orientation_table(camera=None) -> dict[str, dict]:
-    """Read the guide-sensor orientation table from the camera model.
+        Inspect each guide detector's id, ``nQuarter`` and per-amplifier
+        flips using the same camera as the offset and image transforms.
 
-    Convenience inspector that dumps every guide detector's id,
-    ``nQuarter`` and per-amplifier flips. It is the same data
-    :class:`GuiderOrientation` reads per detector; use it to inspect or
-    verify the model. Requires the LSST stack (``lsst.obs.lsst``).
+        Returns
+        -------
+        table : `dict`
+            Mapping of guide sensor name to a dict with ``detector_id``,
+            ``nquarter`` and ``amplifier_flip``.
+        """
+        table: dict[str, dict] = {}
+        for detector in self.camera:
+            if detector.getType() != cameraGeom.DetectorType.GUIDER:
+                continue
+            amplifier_flip = {
+                amplifier.getName(): (
+                    bool(amplifier.getRawFlipX()),
+                    bool(amplifier.getRawFlipY()),
+                )
+                for amplifier in detector
+            }
+            table[detector.getName()] = {
+                "detector_id": detector.getId(),
+                "nquarter": detector.getOrientation().getNQuarter(),
+                "amplifier_flip": amplifier_flip,
+            }
+        return table
 
-    Parameters
-    ----------
-    camera : `lsst.afw.cameraGeom.Camera`, optional
-        Camera to read. Defaults to ``LsstCam.getCamera()``.
-
-    Returns
-    -------
-    table : `dict`
-        Mapping of guide sensor name to a dict with ``detector_id``,
-        ``nquarter`` and ``amplifier_flip``.
-    """
-    from lsst.afw import cameraGeom
-    from lsst.obs.lsst import LsstCam
-
-    if camera is None:
-        camera = LsstCam.getCamera()
-
-    table: dict[str, dict] = {}
-    for detector in camera:
-        if detector.getType() != cameraGeom.DetectorType.GUIDER:
-            continue
-        amplifier_flip = {
-            amplifier.getName(): (
-                bool(amplifier.getRawFlipX()),
-                bool(amplifier.getRawFlipY()),
-            )
-            for amplifier in detector
-        }
-        table[detector.getName()] = {
-            "detector_id": detector.getId(),
-            "nquarter": detector.getOrientation().getNQuarter(),
-            "amplifier_flip": amplifier_flip,
-        }
-    return table
-
-
-def _print_orientation_table(camera=None) -> None:
-    """Print the orientation table read from the camera model."""
-    table = generate_orientation_table(camera)
-    header = "{:10s} {:>5s} {:>8s}   per-amp flip (flipX,flipY)".format(
-        "detector", "detId", "nQuarter"
-    )
-    print(header)
-    print("-" * 72)
-    for detector_name, entry in table.items():
-        amp_flips = ", ".join(
-            "{}:{}{}".format(name, int(flip_x), int(flip_y))
-            for name, (flip_x, flip_y) in entry["amplifier_flip"].items()
+    def print_orientation_table(self) -> None:
+        """Print this camera's guide-sensor orientation table to stdout."""
+        table = self.generate_orientation_table()
+        header = "{:10s} {:>5s} {:>8s}   per-amp flip (flipX,flipY)".format(
+            "detector", "detId", "nQuarter"
         )
-        print(
-            "{:10s} {:5d} {:8d}   {}".format(
-                detector_name,
-                entry["detector_id"],
-                entry["nquarter"],
-                amp_flips,
+        print(header)
+        print("-" * 72)
+        for detector_name, entry in table.items():
+            amp_flips = ", ".join(
+                "{}:{}{}".format(name, int(flip_x), int(flip_y))
+                for name, (flip_x, flip_y) in entry["amplifier_flip"].items()
             )
-        )
-
-
-if __name__ == "__main__":
-    _print_orientation_table()
+            print(
+                "{:10s} {:5d} {:8d}   {}".format(
+                    detector_name,
+                    entry["detector_id"],
+                    entry["nquarter"],
+                    amp_flips,
+                )
+            )
