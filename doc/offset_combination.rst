@@ -270,6 +270,18 @@ API reference
 The :ref:`sensor-tracking` API reference includes ``GuiderSequence``,
 ``CombinedOffset``, ``OffsetCombiner``, ``MultiSensorRunner``,
 ``read_guider_sequence``, ``build_sensor_amplifiers``, and ``run_offline``.
+``GuiderOrientation`` initializes the camera when constructed,
+or uses a camera supplied by the caller.
+Its ``generate_orientation_table()`` method returns the guide-sensor geometry;
+``print_orientation_table()`` prints that table for inspection:
+
+.. code-block:: python
+
+   from lsst.ts.guider.guider_orientation import GuiderOrientation
+
+   orientation = GuiderOrientation()
+   orientation.print_orientation_table()
+
 The camera helpers are documented below.
 
 .. automodapi:: lsst.ts.guider.guider_orientation
