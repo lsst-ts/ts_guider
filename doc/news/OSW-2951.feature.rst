@@ -1,0 +1,3 @@
+Added camera-model amplifier flips and detector rotations
+for guider pixel offsets,
+with camera initialization at construction and orientation inspection methods.
