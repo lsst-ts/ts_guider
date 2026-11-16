@@ -137,6 +137,45 @@ and requires ``ROISEG`` in every input sequence.
 ``ROISEG`` must be ``Segment`` followed by two digits from ``0`` to ``9``;
 for example, ``Segment05`` selects amplifier ``C05``.
 
+Run the offline command
+-----------------------
+
+Use the standard LSST environment with ``lsst.obs.lsst`` available
+for the camera model,
+along with the package's tracking and CSC dependencies.
+Install or reinstall the package from the repository root
+with ``python -m pip install --no-deps --no-build-isolation -e .``
+to create the ``run_guider_offline`` command.
+
+Supply one FITS file per sensor, with stamps already aligned by acquisition:
+
+.. code-block:: bash
+
+   run_guider_offline R00_SG0.fits R04_SG0.fits --seed-frames 10 --min-snr 10
+   run_guider_offline --help
+
+The command calls ``run_offline`` and prints one row per combined acquisition.
+The table contains camera X/Y offsets, standard errors, and sample scatter
+in pixels, followed by ``n_valid`` and ``n_total`` sensor measurement counts.
+``stamp`` is the zero-based acquisition index in the input sequences.
+NaN denotes an unavailable offset or statistic.
+
+``--seed-frames`` and ``--min-snr`` use the tracker defaults unless supplied.
+Other tracker settings keep their defaults.
+Use ``--log-level WARNING`` to suppress progress messages.
+The table goes to standard output, while logs go to standard error,
+so results can be saved with shell redirection:
+
+.. code-block:: bash
+
+   run_guider_offline R00_SG0.fits R04_SG0.fits > offsets.txt
+
+The command exits with status 0 when it produces results,
+1 for processing failures or no combined results,
+and 2 for invalid arguments.
+A run that never locks a reference produces no results.
+No DAQ subscription or Kafka connection is needed.
+
 Offline FITS processing
 -----------------------
 
@@ -213,10 +252,7 @@ Direct field changes affect subsequent processing
 without resetting references or recomputing results;
 callers remain responsible for those changes.
 
-Use the standard LSST environment with ``lsst.obs.lsst`` available
-for the camera model,
-along with the package's tracking and CSC dependencies.
-For example, after activating that environment and installing ts_guider:
+For direct Python use, call ``run_offline`` in the same environment:
 
 .. code-block:: python
 
@@ -249,11 +285,14 @@ sensors locking at different indices, finite short sequences,
 shortest-sequence handling, and retained rejected measurements.
 The companion tests cover amplifier flips and all four quarter turns,
 real guider geometry, combination statistics, and zero/one-sensor cases.
+``tests/test_run_guider_offline.py`` checks the command's printed results,
+argument validation, and failure reporting using synthetic FITS files.
 
 .. code-block:: bash
 
    python -m pytest -q tests/test_guider_orientation.py \
-       tests/test_offset_combiner.py tests/test_multi_sensor_runner.py
+       tests/test_offset_combiner.py tests/test_multi_sensor_runner.py \
+       tests/test_run_guider_offline.py
 
 The implementation follows OSW-2858:
 ``sensor_orientation.py`` becomes ``guider_orientation.py``,
@@ -287,3 +326,5 @@ The camera helpers are documented below.
 .. automodapi:: lsst.ts.guider.guider_orientation
    :no-main-docstr:
    :no-inheritance-diagram:
+
+.. autofunction:: lsst.ts.guider.demo.run_guider_offline.run_guider_offline
