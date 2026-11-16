@@ -1,2 +1,3 @@
 Documented camera-coordinate transforms, offset statistics,
 metadata requirements, and offline reference and acquisition processing.
+Included command-line usage with ``run_guider_offline``.
