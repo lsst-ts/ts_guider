@@ -1,0 +1,2 @@
+Added the standalone ``run_daq_guider_pipeline_demo`` command with configurable logging, per-acquisition output, and timing and offset summaries.
+Added opt-in DAQ emulator validation of known motion and metadata across series, with cleanup of test-owned resources.
