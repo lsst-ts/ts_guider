@@ -1,0 +1,1 @@
+Documented running the live guider demo, interpreting its reports, and handling shutdown and failures.
