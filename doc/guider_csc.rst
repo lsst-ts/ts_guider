@@ -1,20 +1,19 @@
 .. _guider-csc:
 
 Guider CSC processing and publication
-========================================
+=====================================
 
 ``GuiderCsc`` runs the :ref:`streaming-guider-pipeline` while ENABLED and
 publishes its results through salobj. The camera's DAQ stream determines
 when images arrive and when a new guide series begins. Use the standard
 CSC enable/disable commands to control the subscription.
 
-Use :ref:`guider-installation` to prepare the Python package, camera model,
-and DAQ binding. The :ref:`sensor-tracking` and :ref:`offset-combination`
-guides describe the measurements and camera transformations consumed by
-the CSC.
+Use :ref:`guider-installation` to prepare the Python package and DAQ binding.
+The :ref:`sensor-tracking` and :ref:`offset-combination` guides describe
+the measurements and camera transformations used by the CSC.
 
 Interface and configuration
-----------------------------------------
+---------------------------
 
 The CSC and its Remotes use the Guider interface provided by ``ts_xml``.
 
@@ -31,6 +30,10 @@ The CSC and its Remotes use the Guider interface provided by ``ts_xml``.
      - Required
      - DAQ/GDS partition used in regular operation. The configuration
        schema also requires this string in simulation mode.
+   * - ``geometry_source``
+     - ``local``
+     - Use bundled geometry (``local``), require the installed camera (``lsst``),
+       or use the installed camera when available (``auto``).
    * - ``seed_frames``
      - 10
      - Minimum stamps per sensor before its first reference-selection
@@ -90,7 +93,7 @@ for both. Selecting index 2 does not provide an AuxTel-specific camera
 model.
 
 Processing and thread handoff
-----------------------------------------
+-----------------------------
 
 Enabling prepares the CSC to turn incoming stamp images into star-offset
 measurements and publish the results. In regular operation, the C++ DAQ
@@ -101,15 +104,11 @@ A queue holds samples waiting to be published, allowing image processing
 to finish without waiting for those topic writes to complete. Each enable
 creates a fresh processor, queue, and publishing task.
 
-Before subscribing to images, the CSC loads the camera model. This model
-provides the sensor rotations and amplifier flips needed to express all
-offsets in the same camera coordinates. It is normally built on first
-use. Leaving that work until the first offset transformation would hold
-up the DAQ worker inside image processing: the worker cannot return to
-receiving stamps until that call finishes. Loading the model before
-subscription puts this cost in startup instead. The load runs in an
-executor, a separate thread used for blocking work, so the asyncio event
-loop does not have to perform it directly.
+On enable, the CSC prepares the configured geometry on a worker thread
+and logs the selected source before subscribing to images.
+With ``geometry_source: lsst``, an unavailable camera package fails startup.
+With ``auto``, an absent package selects the bundled geometry.
+A failure inside an installed camera package is reported at startup.
 
 Each incoming stamp follows this path:
 
@@ -156,7 +155,7 @@ Processor histories and reference buffers also use memory, as described
 in :ref:`streaming-guider-pipeline`.
 
 Shutdown and recovery
-----------------------------------------
+---------------------
 
 Disabling, entering FAULT, or closing the CSC must finish the current run
 before its processing state can be released. They use the same cleanup
@@ -252,7 +251,7 @@ therefore see an incomplete set of topics for an acquisition while the
 CSC remains ENABLED. Monitor ``logMessage`` for these write failures.
 
 Published results
-----------------------------------------
+-----------------
 
 The CSC publishes measurements and combined offsets through the five
 topics below. The ``stateMetadata``, ``summaryResults``, and
@@ -320,10 +319,10 @@ To match event samples for the same result, compare their ``seqno``,
 ``seqno`` or ``stamp`` fields.
 
 Reading the measurements
-----------------------------------------
+------------------------
 
 Matching array entries to sensors
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Sensor names are sorted and separated by colons. For example,
 ``R00_SG0:R00_SG1`` means array entry 0 belongs to ``R00_SG0`` and entry 1
@@ -350,7 +349,7 @@ integer arrays, and false in ``splitroi``. Data from a ninth distinct
 sensor in a series causes a processing error.
 
 Checking measurement quality
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ``summaryResults.qualityFlag`` and ``perGuiderResults.centroidFitQuality``
 use the same values:
@@ -369,7 +368,7 @@ combined offset is NaN. With one, an offset is available but the scatter
 and standard error are not.
 
 Offsets and star shapes
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
 
 An offset is the measured star position minus its locked reference
 position. The tracker establishes the reference using the sensor's saved
@@ -405,7 +404,7 @@ of the offsets. Failed fits or invalid shapes give NaN moments.
    are NaN.
 
 Fields that are not yet measured
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 These fields do not yet contain measurements:
 
@@ -437,7 +436,7 @@ These fields do not yet contain measurements:
        False does not confirm an unsplit ROI.
 
 Diagnostics and topic watcher
-----------------------------------------
+-----------------------------
 
 Use ``watch_guider_topics`` to monitor the CSC's measurements, status, and
 diagnostic messages. The measurement topics provide the guiding results.
@@ -456,7 +455,7 @@ remain in millimeters. Press Ctrl-C to stop. Use
 ``watch_guider_topics --help`` to see the options.
 
 Validation boundaries
-----------------------------------------
+---------------------
 
 Simulation can check configuration, reference selection, processing,
 publication, and Remote receipt without a DAQ subscription. Feeding stamps

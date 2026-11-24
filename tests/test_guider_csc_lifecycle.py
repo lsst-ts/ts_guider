@@ -59,7 +59,6 @@ def processor(monkeypatch):
     """Replace image processing so failures and shutdown can be controlled."""
     processor = Mock()
     processor._sensor_name = lambda index: f"sensor_{index}"
-    processor.combiner.orientation.camera = object()
     factory = Mock(return_value=processor)
     monkeypatch.setattr(module, "StreamingGuiderProcessor", factory)
     processor.factory = factory
@@ -101,24 +100,38 @@ async def test_simulation_never_imports_native_binding(csc, processor, monkeypat
         await csc.stop_guiding()
 
 
+async def test_required_camera_missing_faults_before_subscription(csc, monkeypatch):
+    binding = bind_source(monkeypatch, csc, Mock())
+    monkeypatch.setitem(sys.modules, "lsst.obs.lsst", None)
+    csc.config.geometry_source = "lsst"
+    with pytest.raises(salobj.ExpectedError, match="requires the obs_lsst"):
+        await csc.start_guiding()
+    binding.DaqStampSource.assert_not_called()
+    assert csc.summary_state == salobj.State.FAULT
+    assert csc.processor is csc._publish_task is None
+
+
 async def test_camera_is_ready_before_native_subscription(csc, processor, monkeypatch):
     events = []
     loop_thread = threading.get_ident()
 
-    class Orientation:
-        @property
-        def camera(self):
-            assert threading.get_ident() != loop_thread
-            events.append("camera")
-            return object()
+    csc.config.geometry_source = "lsst"
+    orientation = Mock(geometry_source="lsst")
 
-    processor.combiner.orientation = Orientation()
+    def load_geometry(*, geometry_source):
+        assert geometry_source == "lsst"
+        assert threading.get_ident() != loop_thread
+        events.append("camera")
+        return orientation
+
+    monkeypatch.setattr(module, "GuiderOrientation", load_geometry)
     source = Mock()
     source.start_stamp_stream.side_effect = lambda callback: events.append("subscribe")
     binding = bind_source(monkeypatch, csc, source)
     await csc.start_guiding()
     try:
         assert events == ["camera", "subscribe"]
+        assert processor.factory.call_args.kwargs["orientation"] is orientation
         binding.DaqStampSource.assert_called_once_with(
             partition="test", locations="all"
         )
@@ -404,13 +417,7 @@ async def test_startup_failure_cleans_resources_and_keeps_cause(
     if point == "import":
         monkeypatch.setitem(sys.modules, "guiderGDS", None)
     elif point == "camera":
-
-        class Orientation:
-            @property
-            def camera(self):
-                raise error
-
-        processor.combiner.orientation = Orientation()
+        monkeypatch.setattr(module, "GuiderOrientation", Mock(side_effect=error))
     elif point == "construct":
         binding.DaqStampSource.side_effect = error
     elif point == "start":
@@ -532,13 +539,12 @@ async def test_stop_cancellation_waits_for_native_join(csc, processor):
 async def test_start_cancellation_never_finalizes(csc, processor, monkeypatch):
     entered, release = threading.Event(), threading.Event()
 
-    class Orientation:
-        @property
-        def camera(self):
-            entered.set()
-            assert release.wait(2)
+    def load_geometry(*, geometry_source):
+        entered.set()
+        assert release.wait(2)
+        return Mock(geometry_source=geometry_source)
 
-    processor.combiner.orientation = Orientation()
+    monkeypatch.setattr(module, "GuiderOrientation", load_geometry)
     bind_source(monkeypatch, csc, Mock())
     caller = asyncio.create_task(csc.start_guiding())
     try:

@@ -1,7 +1,7 @@
 .. _running-guider-csc:
 
 Running the Guider CSC with the DAQ emulator
-==================================================
+============================================
 
 Use the helper below to build the Guider CSC, feed it guider FITS images,
 and watch its results. It sets up the environment for each command from
@@ -9,7 +9,7 @@ one settings file. The processes run in separate terminals; Ctrl-C stops
 one process at a time.
 
 1. Start the development environment
-----------------------------------------
+------------------------------------
 
 On the host, choose a workspace containing the Guider checkout,
 ``ts_xml``, ``ts_salobj``, and the unpacked R5-V13.16 SDK. Put the guider
@@ -53,7 +53,7 @@ Run the script for your platform::
     bash ts_guider/scripts/tune_linux_guider_udp.sh
 
 2. Configure and build once
-----------------------------------------
+---------------------------
 
 Inside the container, as ``saluser``, enter your Guider checkout. Substitute
 its directory name if it is not ``ts_guider``::
@@ -75,8 +75,12 @@ have already prepared this container. Then build and install::
 
     bash scripts/run_guider_emulator.sh build
 
-The helper activates the LSST stack, compiles ``guiderGDS`` into
+The helper uses the active environment, compiles ``guiderGDS`` into
 ``cpp/cmake/build_v16``, installs the Python package, and checks imports.
+When starting from a fresh shell in the development image,
+the helper activates its Python environment.
+To use the installed camera model, add ``setup obs_lsst`` to
+``~/guider_emulator.env`` and set ``geometry_source: lsst`` in the CSC YAML.
 Repeat ``build`` after changing C++ sources or recreating the container.
 A copied worktree with unavailable Git metadata is installed with the
 local development version ``0.0.0+local``.
@@ -85,7 +89,7 @@ For the individual build commands and additional tests, see
 :ref:`guider-installation`.
 
 3. Start the four components
-----------------------------------------
+----------------------------
 
 Open each terminal from the host, then enter the checkout::
 
@@ -127,7 +131,7 @@ reference attempt. A new emulator pass starts a new series and selects
 new references. See :ref:`guider-csc` for the result fields and quality cuts.
 
 4. Stop the run
-----------------------------------------
+---------------
 
 When the emulator finishes, the CSC keeps waiting for images. Leave the
 watcher running and press Ctrl-C in the CSC terminal. During a healthy
@@ -138,7 +142,7 @@ Check the logs for shutdown errors. If the CSC cannot confirm that its
 DAQ worker stopped, restart the CSC process before guiding again.
 
 Checks and troubleshooting
-----------------------------------------
+--------------------------
 
 List the helper commands without starting any services::
 

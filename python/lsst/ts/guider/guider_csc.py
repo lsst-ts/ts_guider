@@ -31,6 +31,7 @@ from lsst.ts.xml.enums.Guider import GuiderStatus
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
 from .error_code import ErrorCode
+from .guider_orientation import GuiderOrientation
 from .pipeline.centroid_measurement import FWHM_PER_SIGMA
 from .pipeline.combined_offset import CombinedOffset
 from .pipeline.guider_tracker_config import GuiderTrackerConfig
@@ -327,18 +328,24 @@ class GuiderCsc(salobj.ConfigurableCsc):
             self.config, "seed_frames", tracker_config.seed_frames
         )
         tracker_config.min_snr = getattr(self.config, "min_snr", tracker_config.min_snr)
+        orientation = await asyncio.to_thread(
+            GuiderOrientation,
+            geometry_source=getattr(self.config, "geometry_source", "local"),
+        )
         processor = StreamingGuiderProcessor(
             tracker_config,
+            orientation=orientation,
             on_combined_offset=self._handle_combined_offset,
             on_visit_start=self._handle_visit_start,
             on_visit_complete=self._handle_visit_complete,
         )
         self.processor = processor
         self.log.info(
-            "Guider pipeline ready: seed_frames=%d min_snr=%g simulation_mode=%d",
+            "Guider pipeline ready: seed_frames=%d min_snr=%g simulation_mode=%d geometry_source=%s",
             tracker_config.seed_frames,
             tracker_config.min_snr,
             self.simulation_mode,
+            orientation.geometry_source,
         )
         if self.simulation_mode != 0:
             self._accept_stamps = True
@@ -346,12 +353,6 @@ class GuiderCsc(salobj.ConfigurableCsc):
 
         import guiderGDS
 
-        # Preload the camera outside the DAQ callback so its first lookup
-        # does not delay the SDK acknowledgement. Capture this processor:
-        # cancelling the await does not cancel work already in the executor.
-        await self._event_loop.run_in_executor(
-            None, lambda: processor.combiner.orientation.camera
-        )
         self.stamp_source = guiderGDS.DaqStampSource(
             partition=self.config.partition,
             locations=guiderGDS.LocationSet.any(),

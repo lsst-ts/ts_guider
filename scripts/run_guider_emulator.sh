@@ -81,9 +81,10 @@ if [[ ! -r "$guider_settings" ]]; then
     exit 2
 fi
 
-# Stack activation may refer to unset shell variables; enable nounset after it.
-source /opt/lsst/software/stack/loadLSST.bash
-setup lsst_distrib
+# A fresh development-container shell needs its Python environment.
+if [[ -z ${CONDA_PREFIX:-} && -r /opt/lsst/software/stack/loadLSST.bash ]]; then
+    source /opt/lsst/software/stack/loadLSST.bash
+fi
 source "$guider_settings"
 set -u
 : "${CCSDAQ:?Set CCSDAQ in the settings file.}"

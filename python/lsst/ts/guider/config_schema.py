@@ -34,6 +34,13 @@ properties:
   partition:
     description: DAQ/GDS partition to subscribe to for guider stamps.
     type: string
+  geometry_source:
+    description: >-
+      Source of guider rotations and amplifier flips. Use bundled geometry
+      (local), require the LSST camera (lsst), or use it when installed (auto).
+    type: string
+    enum: [local, lsst, auto]
+    default: local
   seed_frames:
     description: >-
       Minimum number of stamps collected per sensor before the first
