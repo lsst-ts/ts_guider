@@ -116,6 +116,7 @@ def test_command_duplicate_sensor_is_failure(guider_files, capsys, caplog):
         ["--min-snr", "nan"],
         ["--min-snr", "inf"],
         ["--log-level", "unknown"],
+        ["--geometry-source", "unknown"],
     ],
 )
 def test_command_rejects_invalid_options(options, capsys):
@@ -141,3 +142,19 @@ def test_command_help_without_daq(monkeypatch, capsys):
     assert "run_guider_offline" in output
     assert "--seed-frames" in output
     assert "--min-snr" in output
+
+
+def test_command_auto_without_camera(guider_files, monkeypatch, capsys, caplog):
+    monkeypatch.setitem(sys.modules, "lsst.obs.lsst", None)
+    paths, _ = guider_files
+    with caplog.at_level("INFO"):
+        assert (
+            run_guider_offline(
+                paths + ["--geometry-source", "auto", "--seed-frames", "3"]
+            )
+            == 0
+        )
+    assert "Guider geometry source: local" in caplog.text
+    assert capsys.readouterr().out.splitlines()[1:]
+    assert run_guider_offline(paths + ["--geometry-source", "lsst"]) == 1
+    assert "requires the obs_lsst" in caplog.text

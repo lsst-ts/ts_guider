@@ -28,6 +28,7 @@ import logging
 import math
 from pathlib import Path
 
+from ..guider_orientation import GEOMETRY_SOURCES
 from ..pipeline import GuiderTrackerConfig, run_offline
 
 log = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ def run_guider_offline(args: list[str] | None = None) -> int:
     args : `list` [`str`] or `None`, optional
         Command-line arguments. If `None`, read from ``sys.argv``.
         Supply one FITS path per sensor. Options select the initial seed
-        count, minimum signal-to-noise ratio, and logging level.
+        count, minimum signal-to-noise ratio, geometry source, and log level.
 
     Returns
     -------
@@ -55,7 +56,7 @@ def run_guider_offline(args: list[str] | None = None) -> int:
     Results go to stdout and logs to stderr. Each result lists the
     acquisition index, camera X/Y offsets, standard errors, sample scatter,
     and valid/total measurement counts. All offsets and statistics are in
-    pixels. Requires the LSST camera model but no live DAQ connection.
+    pixels. Geometry defaults to the bundled guider data.
     """
     defaults = GuiderTrackerConfig()
     parser = argparse.ArgumentParser(
@@ -69,6 +70,13 @@ def run_guider_offline(args: list[str] | None = None) -> int:
         nargs="+",
         type=Path,
         help="One FITS sequence per sensor, already aligned by acquisition index",
+    )
+    parser.add_argument(
+        "--geometry-source",
+        choices=GEOMETRY_SOURCES,
+        default="local",
+        help="Use bundled guider geometry (local), the LSST camera (lsst), "
+        "or the LSST camera when installed (auto)",
     )
     parser.add_argument(
         "--seed-frames",
@@ -109,8 +117,10 @@ def run_guider_offline(args: list[str] | None = None) -> int:
         config.min_snr,
     )
     try:
-        results = run_offline(options.fits_paths, config)
-    except (OSError, ValueError, KeyError) as error:
+        results = run_offline(
+            options.fits_paths, config, geometry_source=options.geometry_source
+        )
+    except (OSError, ValueError, KeyError, ImportError) as error:
         log.error("Offline processing failed: %s", error)
         return 1
     if not results:

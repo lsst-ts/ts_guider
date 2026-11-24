@@ -56,10 +56,9 @@ class OffsetCombiner:
         Valid guider metadata is assumed to identify sensors and
         amplifiers present in the camera model.
     orientation : `guider_orientation.GuiderOrientation`, optional
-        Source of the per-sensor flip and rotation, read from the LSST
-        camera model. Defaults to a fresh :class:`GuiderOrientation`,
-        which initializes its camera during construction. Pass a shared
-        instance to reuse one camera across drivers.
+        By default, use the detector rotations and amplifier flips stored
+        in ``ts_guider``. To use the installed LSST camera model, pass
+        ``GuiderOrientation(geometry_source="lsst")``.
     """
 
     def __init__(
@@ -167,7 +166,7 @@ class OffsetCombiner:
     def _to_camera_frame(
         self, sensor_name: str, offset_x: float, offset_y: float
     ) -> tuple[float, float]:
-        """Transform one offset using the metadata's camera-model entry."""
+        """Transform one offset using the metadata's geometry entry."""
         if self.sensor_amplifiers is None:
             return offset_x, offset_y
 
@@ -192,7 +191,7 @@ def build_sensor_amplifiers(
     -------
     sensor_amplifiers : `dict` [`str`, `str`]
         Complete sensor-to-amplifier map identifying each ROI's amplifier.
-        Its orientation is read from the camera model during combination.
+        The selected geometry supplies its orientation during combination.
 
     Raises
     ------

@@ -60,8 +60,7 @@ class MultiSensorRunner:
         contributing sensor requires an entry. With ``None``, offsets
         stay in amplifier coordinates and must already share an orientation.
     orientation : `GuiderOrientation`, optional
-        Camera-model transform provider, optionally shared with other
-        runners. The default initializes its camera during construction.
+        Orientation to use for camera offsets. Defaults to bundled geometry.
     """
 
     def __init__(
@@ -164,7 +163,10 @@ class MultiSensorRunner:
 
 
 def run_offline(
-    fits_paths: list[Path], config: GuiderTrackerConfig | None = None
+    fits_paths: list[Path],
+    config: GuiderTrackerConfig | None = None,
+    *,
+    geometry_source: str = "local",
 ) -> list[CombinedOffset]:
     """Run the full multi-sensor loop over aligned FITS sequences.
 
@@ -187,6 +189,8 @@ def run_offline(
         On failure, retain the seeds and retry with each additional image
         in the common input range, using the entire accumulated prefix.
         Once locked, the reference remains fixed for subsequent images.
+    geometry_source : `str`, optional
+        Source of detector rotations and amplifier flips: local, lsst, or auto.
 
     Returns
     -------
@@ -206,6 +210,8 @@ def run_offline(
         or lack usable camera metadata. Reader, tracker, and unexpected
         camera errors propagate.
     """
+    orientation = GuiderOrientation(geometry_source=geometry_source)
+    log.info("Guider geometry source: %s", orientation.geometry_source)
     config = config if config is not None else GuiderTrackerConfig()
 
     sequences = {}
@@ -224,7 +230,7 @@ def run_offline(
         return []
 
     sensor_amplifiers = build_sensor_amplifiers(sequences)
-    runner = MultiSensorRunner(list(sequences), config, sensor_amplifiers)
+    runner = MultiSensorRunner(list(sequences), config, sensor_amplifiers, orientation)
     n_acquisitions = min(seq.n_stamps for seq in sequences.values())
     measurements_by_acquisition: list[dict[str, CentroidMeasurement]] = [
         {} for _ in range(n_acquisitions)

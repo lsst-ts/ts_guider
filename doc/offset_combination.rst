@@ -40,11 +40,18 @@ X increases along columns and Y along rows.
 Position coordinates start at (0, 0) at the center of the first pixel.
 
 Different sensors can have different orientations.
-``GuiderOrientation`` uses the LSST camera model
-to apply the amplifier's X/Y flips,
+``GuiderOrientation`` applies the amplifier's X/Y flips,
 followed by the detector's rotation in multiples of 90 degrees.
-This expresses every offset along the same camera axes, still in pixels,
-so the offsets can be combined.
+This expresses every offset along the same camera axes, in pixels.
+
+The default geometry source, ``local``, uses the bundled rotations
+and amplifier flips for the eight LSSTCam guide sensors.
+The table was verified against ``obs_lsst`` release ``w_2026_25``.
+Choose ``lsst`` to read the installed LSSTCam model.
+Choose ``auto`` to read that model when its package is available
+and otherwise use the bundled geometry.
+Camera initialization and lookup errors propagate.
+Both sources apply the same transform.
 
 Only the offset from the reference position needs this transformation.
 A constant shift of the coordinate origin would affect both positions equally,
@@ -111,7 +118,7 @@ when constructing ``OffsetCombiner`` or ``MultiSensorRunner``:
 * **Camera coordinates:** pass a dictionary mapping sensor names to amplifiers,
   such as ``{"R00_SG0": "C05"}``.
   Every sensor contributing to the average needs an entry.
-  The camera model supplies the amplifier flips and detector rotation.
+  The selected geometry supplies the amplifier flips and detector rotation.
 * **Amplifier coordinates:**
   pass ``None`` to keep offsets in their original axes.
   Use this only when the offsets already share the same orientation.
@@ -140,9 +147,7 @@ for example, ``Segment05`` selects amplifier ``C05``.
 Run the offline command
 -----------------------
 
-Use the standard LSST environment with ``lsst.obs.lsst`` available
-for the camera model,
-along with the package's tracking and CSC dependencies.
+Use an environment with the package's tracking and CSC dependencies.
 Install or reinstall the package from the repository root
 with ``python -m pip install --no-deps --no-build-isolation -e .``
 to create the ``run_guider_offline`` command.
@@ -154,6 +159,7 @@ Supply one FITS file per sensor, with stamps already aligned by acquisition:
    run_guider_offline R00_SG0.fits R04_SG0.fits --seed-frames 10 --min-snr 10
    run_guider_offline --help
 
+Use ``--geometry-source local|lsst|auto`` to select the geometry source.
 The command calls ``run_offline`` and prints one row per combined acquisition.
 The table contains camera X/Y offsets, standard errors, and sample scatter
 in pixels, followed by ``n_valid`` and ``n_total`` sensor measurement counts.
@@ -263,6 +269,7 @@ For direct Python use, call ``run_offline`` in the same environment:
    results = run_offline(
        [Path("R00_SG0.fits"), Path("R04_SG0.fits")],
        GuiderTrackerConfig(seed_frames=10),
+       geometry_source="local",
    )
    for result in results:
        print(
@@ -277,7 +284,7 @@ Reproducible validation
 
 ``tests/test_multi_sensor_runner.py`` generates noisy synthetic stars,
 writes compressed FITS sequences with known camera offsets,
-and runs the complete offline path against the real camera model.
+and runs the complete offline path with the bundled geometry.
 It checks integer and fractional motion within 0.05 pixel
 for this specific source/noise setup,
 expanding-prefix retries, seed replay,
@@ -309,8 +316,7 @@ API reference
 The :ref:`sensor-tracking` API reference includes ``GuiderSequence``,
 ``CombinedOffset``, ``OffsetCombiner``, ``MultiSensorRunner``,
 ``build_sensor_amplifiers``, and ``run_offline``.
-``GuiderOrientation`` initializes the camera when constructed,
-or uses a camera supplied by the caller.
+``GuiderOrientation`` selects its geometry when constructed.
 Its ``generate_orientation_table()`` method returns the guide-sensor geometry;
 ``print_orientation_table()`` prints that table for inspection:
 

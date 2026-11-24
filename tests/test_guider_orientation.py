@@ -20,9 +20,11 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from lsst.ts.guider import guider_orientation
 from lsst.ts.guider.guider_orientation import (
     GuiderOrientation,
     amplifier_name_from_segment,
@@ -68,7 +70,7 @@ def test_offset_matches_displacement_in_transformed_image(nquarter, flip_x, flip
         ("R44_SG0", (-1, 2)),
     ],
 )
-def test_real_camera_corner_orientations(sensor, expected):
+def test_bundled_corner_orientations(sensor, expected):
     # C05 has raw X flip on these guiders. Their nQuarter values are
     # respectively 5, 6, 4, and 3, covering all four rotations modulo 4.
     orientation = GuiderOrientation()
@@ -119,3 +121,59 @@ def test_fits_segment_to_amplifier(segment, expected):
 def test_malformed_segment_is_rejected(segment):
     with pytest.raises(ValueError, match="Expected ROISEG"):
         amplifier_name_from_segment(segment)
+
+
+def test_geometry_selection_without_camera_package(monkeypatch):
+    missing = ModuleNotFoundError(name="lsst.obs")
+    importer = Mock(side_effect=missing)
+    monkeypatch.setattr(guider_orientation, "import_module", importer)
+    assert GuiderOrientation().geometry_source == "local"
+    assert GuiderOrientation(geometry_source="local").geometry_source == "local"
+    importer.assert_not_called()
+    orientation = GuiderOrientation(geometry_source="auto")
+    assert orientation.geometry_source == "local"
+    assert orientation.amplifier_to_camera_offset(2, -1, "R00_SG0", "C05") == (1, -2)
+    with pytest.raises(ModuleNotFoundError, match="requires the obs_lsst"):
+        GuiderOrientation(geometry_source="lsst")
+    for sensor, amp in [("unknown", "C05"), ("R00_SG0", "C09")]:
+        with pytest.raises(KeyError):
+            orientation.get_amplifier_flip(sensor, amp)
+
+
+def test_geometry_selection_with_camera_package(monkeypatch):
+    model = Mock()
+    importer = Mock(return_value=SimpleNamespace(LsstCam=model))
+    monkeypatch.setattr(guider_orientation, "import_module", importer)
+    for choice in ("auto", "lsst"):
+        orientation = GuiderOrientation(geometry_source=choice)
+        assert orientation.geometry_source == "lsst"
+        assert orientation.camera is model.getCamera.return_value
+    importer.side_effect = ModuleNotFoundError(name="lsst.afw")
+    with pytest.raises(ModuleNotFoundError) as caught:
+        GuiderOrientation(geometry_source="auto")
+    assert caught.value is importer.side_effect
+    importer.side_effect = None
+    model.getCamera.side_effect = RuntimeError("invalid camera")
+    with pytest.raises(RuntimeError, match="invalid camera"):
+        GuiderOrientation(geometry_source="auto")
+
+
+def test_bundled_table_matches_installed_camera():
+    try:
+        from lsst.obs.lsst import LsstCam
+    except ModuleNotFoundError as error:
+        if error.name in ("lsst.obs", "lsst.obs.lsst"):
+            pytest.skip("obs_lsst is unavailable")
+        raise
+    local = GuiderOrientation()
+    model = GuiderOrientation(LsstCam.getCamera())
+    table = local.generate_orientation_table()
+    assert len(table) == 8
+    assert all(len(entry["amplifier_flip"]) == 16 for entry in table.values())
+    assert table == model.generate_orientation_table()
+    for sensor, entry in table.items():
+        for amplifier in entry["amplifier_flip"]:
+            for dx, dy in ((1, 0), (0, 1)):
+                assert local.amplifier_to_camera_offset(dx, dy, sensor, amplifier) == (
+                    model.amplifier_to_camera_offset(dx, dy, sensor, amplifier)
+                )

@@ -22,21 +22,39 @@
 from __future__ import annotations
 
 __all__ = [
+    "GEOMETRY_SOURCES",
     "GuiderOrientation",
     "amplifier_name_from_segment",
 ]
 
 import re
+from importlib import import_module
 
 import numpy as np
-from lsst.afw import cameraGeom
-from lsst.obs.lsst import LsstCam
+
+GEOMETRY_SOURCES = ("local", "lsst", "auto")
+
+# LsstCam guide detector name: (detector ID, raw number of quarter turns).
+# Verified against obs_lsst w_2026_25. The 16 raw amplifier flips are
+# identical on all eight guide detectors in that model.
+_LOCAL_DETECTORS = {
+    "R00_SG0": (189, 5),
+    "R00_SG1": (190, 2),
+    "R04_SG0": (193, 6),
+    "R04_SG1": (194, 3),
+    "R40_SG0": (197, 4),
+    "R40_SG1": (198, 1),
+    "R44_SG0": (201, 3),
+    "R44_SG1": (202, 0),
+}
+_LOCAL_FLIPS = {
+    **{f"C0{i}": (True, False) for i in range(8)},
+    **{f"C1{i}": (True, True) for i in range(8)},
+}
 
 # Integer rotation matrices for k counter-clockwise quarter turns,
 # mirroring ``lsst.summit.utils.guiders`` ROTATION_MATRICES. Row form:
-# (camera_dx, camera_dy) = ((a, b), (c, d)) . (dx, dy). This is generic
-# math, not camera-specific data; the camera-specific values (nQuarter
-# and amplifier flips) come from the camera model at runtime.
+# (camera_dx, camera_dy) = ((a, b), (c, d)) . (dx, dy).
 _ROTATION_MATRICES: dict[int, tuple[tuple[int, int], tuple[int, int]]] = {
     0: ((1, 0), (0, 1)),
     1: ((0, -1), (1, 0)),
@@ -49,7 +67,7 @@ def amplifier_name_from_segment(segment: str) -> str:
     """Return the amplifier name for a ``ROISEG`` metadata value.
 
     For valid metadata this matches ``lsst.summit.utils.guiders``
-    ``getAmpNameFromMetadata`` (``"C" + segment[7:]``). The camera model
+    ``getAmpNameFromMetadata`` (``"C" + segment[7:]``). The selected geometry
     determines whether the resulting amplifier exists on a detector.
 
     Parameters
@@ -76,7 +94,7 @@ def amplifier_name_from_segment(segment: str) -> str:
 
 
 class GuiderOrientation:
-    """Amplifier-to-camera transforms read from the LSST camera model.
+    """Transform amplifier pixels and offsets into camera coordinates.
 
     Centroiding runs in amplifier (ROI) pixel space, the orientation in
     which the DAQ delivers each stamp. Before combining the eight guide
@@ -91,23 +109,41 @@ class GuiderOrientation:
     2. Detector rotation by the detector's ``nQuarter`` (number of 90
        degree turns), fixed per CCD.
 
-    The flip and rotation values come from ``lsst.obs.lsst.LsstCam`` at
-    runtime, not from a static table. The camera is initialized in the
-    constructor and reused; ``get_nquarter`` and
-    ``get_amplifier_flip`` read from that same camera on each transform.
-    Combination transforms each contributing sensor's offset for each
-    acquisition; there is no separate orientation cache.
-
     Parameters
     ----------
     camera : `lsst.afw.cameraGeom.Camera`, optional
-        Camera to read. If omitted, call ``LsstCam.getCamera()`` during
-        construction. Pass an existing camera to share one across the
-        pipeline.
+        An existing LSST camera to use directly.
+    geometry_source : `str`, optional
+        Use the bundled guider geometry (``local``, the default), require
+        the installed camera (``lsst``), or prefer the installed camera
+        when available (``auto``). Supplying a camera selects ``lsst``.
+        The resolved source is available as ``geometry_source``.
     """
 
-    def __init__(self, camera=None):
-        self.camera = camera if camera is not None else LsstCam.getCamera()
+    def __init__(self, camera=None, *, geometry_source: str | None = None):
+        if geometry_source is None:
+            geometry_source = "local" if camera is None else "lsst"
+        if geometry_source not in GEOMETRY_SOURCES:
+            raise ValueError(f"Unknown geometry source {geometry_source!r}.")
+        if camera is not None and geometry_source == "local":
+            raise ValueError("A supplied camera cannot be used with local geometry.")
+        if camera is None and geometry_source != "local":
+            try:
+                obs_lsst = import_module("lsst.obs.lsst")
+            except ModuleNotFoundError as error:
+                if error.name not in ("lsst.obs", "lsst.obs.lsst"):
+                    raise
+                if geometry_source == "lsst":
+                    raise ModuleNotFoundError(
+                        "geometry_source='lsst' requires the obs_lsst camera package.",
+                        name=error.name,
+                    ) from error
+            else:
+                camera = obs_lsst.LsstCam.getCamera()
+                if camera is None:
+                    raise RuntimeError("LsstCam.getCamera() returned no camera.")
+        self.camera = camera
+        self.geometry_source = "local" if camera is None else "lsst"
 
     def get_nquarter(self, detector_name: str) -> int:
         """Return the detector ``nQuarter``.
@@ -123,6 +159,8 @@ class GuiderOrientation:
             Raw number of 90 degree turns, for use with ``numpy.rot90``
             or, reduced modulo 4, with :data:`_ROTATION_MATRICES`.
         """
+        if self.camera is None:
+            return _LOCAL_DETECTORS[detector_name][1]
         return self.camera[detector_name].getOrientation().getNQuarter()
 
     def get_amplifier_flip(
@@ -142,6 +180,10 @@ class GuiderOrientation:
         flips : `tuple` [`bool`, `bool`]
             Whether to flip in X and in Y to reach CCD orientation.
         """
+        if self.camera is None:
+            if detector_name not in _LOCAL_DETECTORS:
+                raise KeyError(detector_name)
+            return _LOCAL_FLIPS[amplifier_name]
         amplifier = self.camera[detector_name][amplifier_name]
         return bool(amplifier.getRawFlipX()), bool(amplifier.getRawFlipY())
 
@@ -222,10 +264,10 @@ class GuiderOrientation:
         return np.rot90(ccd_image, -self.get_nquarter(detector_name))
 
     def generate_orientation_table(self) -> dict[str, dict]:
-        """Read the guide-sensor orientation table from this camera.
+        """Return the guide-sensor orientation table for the selected source.
 
         Inspect each guide detector's id, ``nQuarter`` and per-amplifier
-        flips using the same camera as the offset and image transforms.
+        flips used by the offset and image transforms.
 
         Returns
         -------
@@ -233,9 +275,19 @@ class GuiderOrientation:
             Mapping of guide sensor name to a dict with ``detector_id``,
             ``nquarter`` and ``amplifier_flip``.
         """
+        if self.camera is None:
+            return {
+                name: {
+                    "detector_id": detector_id,
+                    "nquarter": nquarter,
+                    "amplifier_flip": _LOCAL_FLIPS.copy(),
+                }
+                for name, (detector_id, nquarter) in _LOCAL_DETECTORS.items()
+            }
+
         table: dict[str, dict] = {}
         for detector in self.camera:
-            if detector.getType() != cameraGeom.DetectorType.GUIDER:
+            if detector.getType().name != "GUIDER":
                 continue
             amplifier_flip = {
                 amplifier.getName(): (
