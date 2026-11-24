@@ -1,0 +1,12 @@
+Integrated the streaming guider processor with CSC configuration,
+DAQ acquisition, simulated stamp input, and enable/disable transitions.
+Added the ``geometry_source`` CSC setting to select local guider tables
+(the default), the installed LSST camera (``lsst``),
+or the installed camera when available (``auto``).
+The CSC logs the selected source before subscribing to DAQ stamps.
+Added fault handling and deadlines for stopping acquisition
+and draining queued publications.
+Published acquisition metadata, camera-frame offsets in millimeters,
+and per-sensor quality and shape moments through Guider events and telemetry.
+Added diagnostic logs with combined offsets, uncertainties, scatter,
+and contributing sensor counts.

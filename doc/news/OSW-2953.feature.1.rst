@@ -1,0 +1,1 @@
+Added the ``watch_guider_topics`` command to display Guider events, offset telemetry, diagnostic logs, and errors.

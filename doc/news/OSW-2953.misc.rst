@@ -1,0 +1,2 @@
+Added ``run_guider_emulator.sh`` to prepare the container, build the binding, run the CSC and DAQ emulator, and unit tests using shared settings.
+Added a development-image Dockerfile and build script to provide passwordless sudo for container setup.

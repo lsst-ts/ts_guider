@@ -1,0 +1,4 @@
+partition: gds-emu
+seed_frames: 10
+min_snr: 5.0
+geometry_source: local
