@@ -168,7 +168,6 @@ def test_decoder_and_pipeline_across_emulator_series(tmp_path):
         on_visit_start=lambda sequence, label: starts.append((sequence, label)),
         on_visit_complete=lambda sequence, offsets: visits.append((sequence, offsets)),
     )
-    processor.combiner.orientation.camera
 
     def on_stamp(pixels, metadata):
         if errors:

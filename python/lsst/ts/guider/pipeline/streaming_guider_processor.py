@@ -102,7 +102,7 @@ class StreamingGuiderProcessor:
         determines the guider detector name automatically.
         If an index belongs to a non-guider board, the processor uses a
         diagnostic label such as ``sensor_00``. Camera-coordinate conversion
-        still requires a valid detector name from the camera model.
+        still requires a detector name in the selected geometry.
     progress_interval : `int`, optional
         Log progress every this many received stamps. Zero or a negative
         value disables progress logging.
@@ -119,7 +119,7 @@ class StreamingGuiderProcessor:
         sensor contributing to a combined offset needs an entry.
     orientation : `GuiderOrientation` or `None`, optional
         Camera geometry used by the combiner. If omitted, the combiner
-        creates an instance that loads the camera on its first transform.
+        uses the bundled detector rotations and amplifier flips.
     on_combined_offset : callable or `None`, optional
         Called with one ``CombinedOffset`` when a live acquisition closes.
         Combinations during series completion do not call this function.

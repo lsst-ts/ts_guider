@@ -245,6 +245,7 @@ def test_cli_accepts_zero_limits_and_uses_config_defaults(monkeypatch):
     runner.assert_called_once_with(processor, "gds-emu", 0, 0.0)
     config = factory.call_args.args[0]
     assert config.seed_frames == GuiderTrackerConfig.seed_frames
+    assert factory.call_args.kwargs["orientation"].geometry_source == "local"
     assert config.min_snr == 0
     processor.finalize.assert_called_once_with()
 
@@ -257,7 +258,11 @@ def test_cli_forwards_processing_options_and_selects_callbacks(monkeypatch, per_
     monkeypatch.setattr(demo, "StreamingGuiderProcessor", factory)
     monkeypatch.setattr(demo, "run_live", runner)
     monkeypatch.setattr(demo, "report", Mock())
+    orientation = Mock(geometry_source="lsst")
+    load_geometry = Mock(return_value=orientation)
+    monkeypatch.setattr(demo, "GuiderOrientation", load_geometry)
     args = [
+        "--geometry-source=lsst",
         "--partition=test",
         "--max-stamps=3",
         "--timeout=1.5",
@@ -270,8 +275,10 @@ def test_cli_forwards_processing_options_and_selects_callbacks(monkeypatch, per_
     assert run_daq_guider_pipeline_demo(args) == 1
     config = factory.call_args.args[0]
     assert (config.seed_frames, config.min_snr) == (4, 7.5)
+    load_geometry.assert_called_once_with(geometry_source="lsst")
     factory.assert_called_once_with(
         config,
+        orientation=orientation,
         progress_interval=11,
         on_visit_start=demo.log_visit_start if per_frame else None,
         on_visit_complete=demo.log_visit_summary,
@@ -348,15 +355,13 @@ def test_main_orders_camera_stream_shutdown_finalization_and_report(
         combined_offsets=[object()], metrics=SimpleNamespace(total_stamps=0)
     )
 
-    class Orientation:
-        @property
-        def camera(self):
-            events.append("camera")
-            if failure == "camera":
-                raise error
-            return object()
+    def load_geometry(*, geometry_source):
+        events.append("camera")
+        if failure == "camera":
+            raise error
+        return Mock(geometry_source=geometry_source)
 
-    processor.combiner.orientation = Orientation()
+    monkeypatch.setattr(demo, "GuiderOrientation", load_geometry)
 
     def process(*args):
         events.append("stamp")

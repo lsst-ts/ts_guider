@@ -31,6 +31,7 @@ import threading
 from collections.abc import Callable
 from time import perf_counter
 
+from ..guider_orientation import GEOMETRY_SOURCES, GuiderOrientation
 from ..pipeline import (
     CombinedOffset,
     GuiderTrackerConfig,
@@ -217,6 +218,13 @@ def _build_parser() -> argparse.ArgumentParser:
         "deadline (default: 100).",
     )
     parser.add_argument(
+        "--geometry-source",
+        choices=GEOMETRY_SOURCES,
+        default="local",
+        help="Use bundled guider geometry (local), the LSST camera (lsst), "
+        "or the LSST camera when installed (auto)",
+    )
+    parser.add_argument(
         "--seed-frames",
         type=int,
         default=GuiderTrackerConfig.seed_frames,
@@ -304,8 +312,11 @@ def run_daq_guider_pipeline_demo(argv: list[str] | None = None) -> int:
     )
     logging.getLogger("lsst.ts.guider").setLevel(args.log_level)
     config = GuiderTrackerConfig(seed_frames=args.seed_frames, min_snr=args.min_snr)
+    orientation = GuiderOrientation(geometry_source=args.geometry_source)
+    log.info("Guider geometry source: %s", orientation.geometry_source)
     processor = StreamingGuiderProcessor(
         config,
+        orientation=orientation,
         progress_interval=args.progress,
         on_visit_start=log_visit_start if args.per_frame else None,
         on_visit_complete=log_visit_summary,
@@ -313,9 +324,6 @@ def run_daq_guider_pipeline_demo(argv: list[str] | None = None) -> int:
     if args.per_frame:
         processor.on_combined_offset = make_combined_offset_logger(processor)
 
-    # Construct the camera before subscribing. Its first lazy build can
-    # otherwise block stamp handling and the next series' discovery ACK.
-    processor.combiner.orientation.camera
     run_live(processor, args.partition, args.max_stamps, args.timeout)
     processor.finalize()
     report(processor)

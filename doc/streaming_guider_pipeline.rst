@@ -3,7 +3,7 @@
 .. _streaming-guider-pipeline:
 
 Live guider processing
-========================================
+======================
 
 ``StreamingGuiderProcessor`` receives DAQ stamps, passes each image to
 the appropriate ``SensorTracker``, and groups the returned measurements
@@ -27,7 +27,7 @@ offsets and processing metrics; it does not publish SAL topics or send
 telescope corrections.
 
 Main call flow
-----------------------------------------
+--------------
 
 The following trees show the main method calls. Indentation means that
 one method calls another; calls at the same level run from top to bottom.
@@ -74,7 +74,7 @@ streaming. It combines pending acquisitions without calling
 ``on_visit_complete``.
 
 Reference selection and measurements
-----------------------------------------
+------------------------------------
 
 For every stamp, ``on_stamp`` reads the metadata, obtains the sensor's
 tracker, and calls ``SensorTracker.process_stamp``. The tracker owns
@@ -108,7 +108,7 @@ All trackers share the processor's mutable configuration. Changing it
 affects subsequent processing without resetting existing references.
 
 DAQ metadata
-----------------------------------------
+------------
 
 ``StampMetadata`` carries the sensor identity, acquisition counters, and
 ROI information across the C++/Python boundary:
@@ -147,7 +147,7 @@ the series, preferring ``obs_id`` over ``series_id`` on that stamp.
 Once chosen, the label is kept until the next series.
 
 Detector and amplifier names
-----------------------------------------
+----------------------------
 
 The processor decodes detector names from ``sensor_index`` using
 :ref:`sensor-identifiers`. Supply ``sensor_names`` to override particular
@@ -157,7 +157,7 @@ still require a detector that exists in the camera model.
 
 Streaming offsets always use camera coordinates. The detector-to-amplifier
 dictionary tells the combiner which amplifier contains each sensor's ROI.
-The camera model then supplies that amplifier's flips and the detector's
+The selected geometry supplies that amplifier's flips and the detector's
 rotation.
 
 * With ``sensor_amplifiers=None`` (the default), the processor builds the
@@ -182,7 +182,7 @@ metadata before its stamps; the decoder's default segment value alone
 does not identify the intended ROI amplifier.
 
 When acquisitions are combined
-----------------------------------------
+------------------------------
 
 Incoming stamps must be ordered by acquisition within a series, with
 no repeated sensor/acquisition pairs. Sensor order within an acquisition
@@ -236,7 +236,7 @@ describes the scatter and standard-error fields, including the single-sensor
 case.
 
 Series changes and result callbacks
-----------------------------------------
+-----------------------------------
 
 A different ``sequence`` finishes the previous series and starts another,
 including a change from 65535 to 0. References, pending seeds, acquisition
@@ -270,7 +270,7 @@ results with a series. Its list is new, but the result objects are shared
 with ``combined_offsets``.
 
 Threads, shutdown, and errors
-----------------------------------------
+-----------------------------
 
 ``DaqStampSource`` uses one C++ worker thread to deliver all sensors'
 stamps sequentially. That worker runs ``on_stamp`` and any callbacks it
@@ -304,7 +304,7 @@ logs callback exceptions and contains them. Finalize only after a normal
 return from ``run_live``; a processing or shutdown failure ends that run.
 
 Metrics and memory use
-----------------------------------------
+----------------------
 
 ``StreamingMetrics`` accumulates counts and timing samples across series:
 
@@ -344,7 +344,7 @@ for logging. Reporting is separate from the tracking and combination
 operations described here.
 
 API reference
-----------------------------------------
+-------------
 
 ``StreamingGuiderProcessor`` and ``StreamingMetrics`` are documented in
 the pipeline API reference under :ref:`sensor-tracking`.

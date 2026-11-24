@@ -1,7 +1,7 @@
 .. _daq-guider-pipeline-demo:
 
 DAQ guider pipeline demo
-========================================
+========================
 
 The ``run_daq_guider_pipeline_demo`` command receives DAQ stamps, tracks
 each sensor's reference star, and reports combined offsets in camera
@@ -17,7 +17,7 @@ that stamps reach Python. For the processing steps and call flow, see
 :ref:`streaming-guider-pipeline`.
 
 Three-terminal run
-----------------------------------------
+------------------
 
 Use three shells in the prepared development container. Each needs the
 activated LSST environment, SDK executables and libraries on its paths,
@@ -37,8 +37,8 @@ This example disables both automatic stopping limits so that it can
 receive both emulator passes below. Stop it with Ctrl-C after the emulator
 finishes. For a timed run, replace ``--timeout 0`` with a duration in
 seconds that allows time to start the emulator and receive its data.
-The camera model is constructed before subscription, keeping that initial
-setup out of stamp processing.
+Use ``--geometry-source local|lsst|auto`` to select the orientation data.
+The demo logs the resolved source before subscribing to stamps.
 
 In terminal 3, publish matching guider FITS sequences::
 
@@ -71,7 +71,7 @@ stop the partition service or emulator; close those processes in their
 own terminals when they are no longer needed.
 
 Command options
-----------------------------------------
+---------------
 
 Run ``run_daq_guider_pipeline_demo --help`` for the current options.
 Requesting help does not require the binding or open a DAQ stream.
@@ -126,7 +126,7 @@ For example, ``--log-level WARNING`` suppresses reports and keeps warnings
 and errors, including timeout messages.
 
 Reading the results
-----------------------------------------
+-------------------
 
 The live trace identifies each acquisition by its stamp index and reports
 ``dx`` and ``dy`` in camera pixels, their standard errors, sensor scatter,
@@ -174,7 +174,7 @@ rate uses elapsed time between received stamps, including pauses in
 delivery; it is not a measurement of maximum processing throughput.
 
 Stopping and failures
-----------------------------------------
+---------------------
 
 A count limit, timeout, or Ctrl-C during streaming is a normal stop. After
 the source stops and its worker joins, the demo finalizes the processor
@@ -199,6 +199,6 @@ reference or the series ends. The :ref:`installation guide
 checks and the environment needed to validate the decoder with DAQ traffic.
 
 API reference
-----------------------------------------
+-------------
 
 .. autofunction:: lsst.ts.guider.demo.run_daq_guider_pipeline_demo.run_daq_guider_pipeline_demo

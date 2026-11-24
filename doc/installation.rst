@@ -3,8 +3,9 @@
 Building and testing the guider pipeline
 ========================================
 
-The Python tracking code runs in the LSST environment. Receiving live
-DAQ stamps also requires the DAQ SDK and the ``guiderGDS`` C++ extension.
+The Python tracking code uses the bundled guider geometry by default.
+Receiving live DAQ stamps also requires the DAQ SDK
+and the ``guiderGDS`` C++ extension.
 The Python package and that extension are built separately.
 
 The DAQ commands below use the Linux x86-64 SDK. On macOS, build and run
@@ -13,22 +14,20 @@ the DAQ components inside the Linux development container described in
 obtaining the SDK, and arranging the emulator FITS files.
 
 Activate the development environment
-----------------------------------------
+------------------------------------
 
-In an existing LSST development container, activate the stack:
+Activate the environment containing NumPy, SciPy, Astropy, GalSim, PyYAML,
+and compatible ``ts_salobj`` and ``ts_xml`` packages.
+CSC configuration and tests also require ``ts_config_ocs``.
+In the standard development container, use:
 
 .. code-block:: bash
 
    source /opt/lsst/software/stack/loadLSST.bash
-   setup lsst_distrib
 
-For a separately installed Linux stack, use its activation script instead.
-The environment must provide the package's Python dependencies: NumPy,
-SciPy, Astropy, GalSim, and PyYAML, along with compatible ``ts_salobj``,
-``ts_xml``, and ``obs_lsst`` packages. The camera model comes from
-``lsst.obs.lsst``. CSC configuration and tests also require ``ts_config_ocs``.
-Even a standalone tracking import loads the package's CSC imports, so
-``ts_salobj`` and ``ts_xml`` must be available.
+The default ``local`` geometry works without Science Pipelines.
+To use the installed camera model in this container, run ``setup obs_lsst``
+and select ``lsst`` or ``auto``.
 
 Choose the checkout to work on and keep these paths consistent in every
 terminal:
@@ -43,7 +42,7 @@ If using local dependency checkouts, add their ``python`` directories to
 ``PYTHONPATH`` as well. Use versions compatible with this Guider checkout.
 
 Install the Python package
-----------------------------------------
+--------------------------
 
 With the dependencies already available, install the checkout in editable
 mode to create its console commands:
@@ -62,7 +61,7 @@ tools, including setuptools and setuptools-scm; they do not install them.
 Repeat the editable install after recreating a development container.
 
 Python tests without a DAQ connection
-----------------------------------------
+-------------------------------------
 
 The following tests exercise detection, tracking, camera transformations,
 offset combination, streaming coordination, and demo handling:
@@ -90,7 +89,7 @@ test environment, Kafka services, and compatible XML and configuration
 packages. Run those in the configured T&S development environment.
 
 C++ tests without the SDK
-----------------------------------------
+-------------------------
 
 CMake, a C++ compiler, and GoogleTest are sufficient for the stamp model
 tests. In the LSST development environment, GoogleTest is already available.
@@ -113,7 +112,7 @@ The two CMake switches are independent: ``BUILD_MODULE`` defaults to
 SDK-free tests and the DAQ extension so their cached settings are clear.
 
 Select the DAQ SDK
-----------------------------------------
+------------------
 
 For the extension, also provide pybind11 and an unpacked SDK containing
 ``include/gds/Decoder.hh`` and ``x86/lib``. The development recipe uses
@@ -147,7 +146,7 @@ verified development aliases are needed, create them using the
 :ref:`stamp-source setup instructions <daq-stamp-source-demo>`.
 
 Build and check the DAQ binding
-----------------------------------------
+-------------------------------
 
 Use the same activated Python environment for the build and the tests:
 
@@ -184,7 +183,7 @@ An explicit build is preferable for diagnosis because it shows compiler
 and linker errors directly and lets you verify which module is loaded.
 
 Prepare for live DAQ traffic
-----------------------------------------
+----------------------------
 
 The scripts in ``scripts/`` perform different parts of local emulator
 setup. Run them from the repository root, in the environment listed here:
@@ -245,7 +244,7 @@ limits to 134217728 bytes and the network backlog to 5000. Neither starts
 the guider, a partition service, or an emulator.
 
 Decoder and emulator validation
-----------------------------------------
+-------------------------------
 
 The SDK-free and binding tests above do not verify that the decoder reads
 ROI metadata from START or image labels from RESUME. The decoder tests
@@ -335,7 +334,7 @@ For a manual service/subscriber/emulator session, see the
 :ref:`live pipeline demo <daq-guider-pipeline-demo>`.
 
 Build the documentation
-----------------------------------------
+-----------------------
 
 Documentation builds need Documenteer and its Sphinx dependencies,
 provided by the project's ``dev`` extra (``documenteer[pipelines]``).

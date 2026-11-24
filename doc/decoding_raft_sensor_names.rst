@@ -1,7 +1,7 @@
 .. _sensor-identifiers:
 
 DAQ sensor and amplifier identifiers
-========================================
+====================================
 
 Each DAQ stamp carries integer identifiers for its detector and ROI
 amplifier. The functions in ``lsst.ts.guider.sensor_identifiers`` convert
@@ -9,7 +9,7 @@ these values into names used by the camera model, such as ``R40_SG0``
 and ``C05``.
 
 Decoding the sensor index
-----------------------------------------
+-------------------------
 
 LSSTCam has a 5-by-5 grid of raft bays, named R00 through R44 by row and
 column. Each corner raft has two guide sensors, SG0 and SG1, for eight
@@ -92,7 +92,7 @@ than board 1. It does not check whether the bay and sensor slot contain
 a physical guide sensor.
 
 Identifying the amplifier
-----------------------------------------
+-------------------------
 
 ``StampMetadata.segment`` identifies the amplifier containing the ROI.
 It is separate from ``sensor_index``: the detector name identifies the
@@ -116,10 +116,11 @@ such as ``Segment05``. The live DAQ metadata supplies the integer ``5``.
 Neither helper looks up names in the camera model. ``OffsetCombiner``
 uses the detector and amplifier names to obtain the flips and rotation
 needed to express offsets in camera coordinates. The names must exist
-in that model; see :ref:`offset-combination`.
+in the selected geometry.
+See :ref:`offset-combination`.
 
 API reference
-----------------------------------------
+-------------
 
 .. automodapi:: lsst.ts.guider.sensor_identifiers
    :no-main-docstr:
