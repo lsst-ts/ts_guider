@@ -1,3 +1,3 @@
-Added camera-model amplifier flips and detector rotations
-for guider pixel offsets,
-with camera initialization at construction and orientation inspection methods.
+Added guider rotations and amplifier flips for camera-coordinate offsets.
+Geometry defaults to the bundled table and can use the installed LSST camera
+explicitly or automatically when available.
